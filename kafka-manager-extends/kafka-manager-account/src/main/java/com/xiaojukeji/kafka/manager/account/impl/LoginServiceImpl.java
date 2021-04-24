@@ -77,6 +77,16 @@ public class LoginServiceImpl implements LoginService {
             return true;
         }
 
+        if (request.getServletPath().contains(ApiPrefix.API_V1_TOPIC_CREATE)) {
+            Result<String> userResult = singleSignOn.checkBasicAuth(request);
+            if (ValidateUtils.isNull(userResult) || userResult.failed()) {
+                return false;
+            }
+
+            return true;
+        }
+
+
         String username = singleSignOn.checkLoginAndGetLdap(request);
         if (ValidateUtils.isBlank(username)) {
             // 未登录, 则返回false, 同时重定向到登录页面

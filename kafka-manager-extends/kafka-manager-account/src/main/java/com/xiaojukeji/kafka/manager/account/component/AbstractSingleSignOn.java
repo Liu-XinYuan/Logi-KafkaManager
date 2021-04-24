@@ -26,4 +26,8 @@ public abstract class AbstractSingleSignOn {
     public abstract String checkLoginAndGetLdap(HttpServletRequest request);
 
     public abstract void setRedirectToLoginPage(HttpServletResponse response);
+
+    public abstract Result<String> checkBasicAuth(HttpServletRequest request);
+
+    public abstract Result<String> authenticate(String user, String password);
 }

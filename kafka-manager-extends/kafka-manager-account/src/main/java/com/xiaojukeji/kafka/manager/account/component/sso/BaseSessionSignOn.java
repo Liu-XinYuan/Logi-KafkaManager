@@ -14,6 +14,7 @@ import com.xiaojukeji.kafka.manager.account.component.ldap.LdapAuthentication;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import sun.misc.BASE64Decoder;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -78,7 +79,9 @@ public class BaseSessionSignOn extends AbstractSingleSignOn {
         if (!accountResult.getData().getPassword().equals(EncryptUtil.md5(dto.getPassword()))) {
             return Result.buildFailure("password illegal");
         }
-        return Result.buildSuc(accountResult.getData().getUsername());
+
+        return authenticate(dto.getUsername(), dto.getPassword());
+
     }
 
     @Override
@@ -104,4 +107,38 @@ public class BaseSessionSignOn extends AbstractSingleSignOn {
         response.setStatus(AbstractSingleSignOn.REDIRECT_CODE);
         response.addHeader(AbstractSingleSignOn.HEADER_REDIRECT_KEY, "");
     }
+
+
+    @Override
+    public Result<String> checkBasicAuth(HttpServletRequest request) {
+        String authorization = request.getHeader("authorization");
+        String userAndPass;
+        try {
+            userAndPass = new String(new BASE64Decoder().decodeBuffer(authorization.split(" ")[1]));
+        } catch (Exception e) {
+            return Result.buildFailure("authorization decode failed");
+        }
+        String user = userAndPass.split(":")[0];
+        String pass = userAndPass.split(":")[1];
+        return authenticate(user, pass);
+    }
+
+    @Override
+    public Result<String> authenticate(String user, String password) {
+        if (ValidateUtils.isBlank(user) || ValidateUtils.isNull(password)) {
+            return null;
+        }
+        Result<AccountDO> accountResult = accountService.getAccountDO(password);
+        if (ValidateUtils.isNull(accountResult) || accountResult.failed()) {
+            return new Result<>(accountResult.getCode(), accountResult.getMessage());
+        }
+        if (ValidateUtils.isNull(accountResult.getData())) {
+            return Result.buildFailure("username illegal");
+        }
+        if (!accountResult.getData().getPassword().equals(EncryptUtil.md5(password))) {
+            return Result.buildFailure("password illegal");
+        }
+        return Result.buildSuc(accountResult.getData().getUsername());
+    }
+
 }

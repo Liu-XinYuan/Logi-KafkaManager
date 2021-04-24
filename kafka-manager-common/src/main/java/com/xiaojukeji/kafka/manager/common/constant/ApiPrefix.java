@@ -22,4 +22,7 @@ public class ApiPrefix {
 
     // gateway
     public static final String GATEWAY_API_V1_PREFIX = "/gateway" + API_V1_PREFIX;
+
+    //create topic
+    public static final String API_V1_TOPIC_CREATE = API_V1_OP_PREFIX + "utils/topics";
 }
