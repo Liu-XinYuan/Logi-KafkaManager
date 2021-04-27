@@ -49,37 +49,6 @@ public class BaseSessionSignOn extends AbstractSingleSignOn {
             return Result.buildFailure("Missing parameters");
         }
 
-        Result<AccountDO> accountResult = accountService.getAccountDO(dto.getUsername());
-
-        //判断是否激活了LDAP验证, 若激活则也可使用ldap进行认证
-        if(!ValidateUtils.isNull(accountLdapEnabled) && accountLdapEnabled){
-            //去LDAP验证账密
-            if(!ldapAuthentication.authenticate(dto.getUsername(),dto.getPassword())){
-                return Result.buildFrom(ResultStatus.LDAP_AUTHENTICATION_FAILED);
-            }
-
-            if((ValidateUtils.isNull(accountResult) || ValidateUtils.isNull(accountResult.getData())) && authUserRegistration){
-                //自动注册
-                AccountDO accountDO = new AccountDO();
-                accountDO.setUsername(dto.getUsername());
-                accountDO.setRole(AccountRoleEnum.getUserRoleEnum(authUserRegistrationRole).getRole());
-                accountDO.setPassword(dto.getPassword());
-                accountService.createAccount(accountDO);
-            }
-
-            return Result.buildSuc(dto.getUsername());
-        }
-
-        if (ValidateUtils.isNull(accountResult) || accountResult.failed()) {
-            return new Result<>(accountResult.getCode(), accountResult.getMessage());
-        }
-        if (ValidateUtils.isNull(accountResult.getData())) {
-            return Result.buildFailure("username illegal");
-        }
-        if (!accountResult.getData().getPassword().equals(EncryptUtil.md5(dto.getPassword()))) {
-            return Result.buildFailure("password illegal");
-        }
-
         return authenticate(dto.getUsername(), dto.getPassword());
 
     }
@@ -125,10 +94,31 @@ public class BaseSessionSignOn extends AbstractSingleSignOn {
 
     @Override
     public Result<String> authenticate(String user, String password) {
+        Result<AccountDO> accountResult = accountService.getAccountDO(user);
+
+        //判断是否激活了LDAP验证, 若激活则也可使用ldap进行认证
+        if(!ValidateUtils.isNull(accountLdapEnabled) && accountLdapEnabled){
+            //去LDAP验证账密
+            if (!ldapAuthentication.authenticate(user, password)) {
+                return Result.buildFrom(ResultStatus.LDAP_AUTHENTICATION_FAILED);
+            }
+
+            if((ValidateUtils.isNull(accountResult) || ValidateUtils.isNull(accountResult.getData())) && authUserRegistration){
+                //自动注册
+                AccountDO accountDO = new AccountDO();
+                accountDO.setUsername(user);
+                accountDO.setRole(AccountRoleEnum.getUserRoleEnum(authUserRegistrationRole).getRole());
+                accountDO.setPassword(password);
+                accountService.createAccount(accountDO);
+            }
+
+            return Result.buildSuc(user);
+        }
+
         if (ValidateUtils.isBlank(user) || ValidateUtils.isNull(password)) {
             return null;
         }
-        Result<AccountDO> accountResult = accountService.getAccountDO(password);
+
         if (ValidateUtils.isNull(accountResult) || accountResult.failed()) {
             return new Result<>(accountResult.getCode(), accountResult.getMessage());
         }
