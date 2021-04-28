@@ -67,6 +67,7 @@ public class LoginServiceImpl implements LoginService {
         if (ValidateUtils.isNull(classRequestMappingValue)) {
             LOGGER.error("class=LoginServiceImpl||method=checkLogin||msg=uri illegal||uri={}", request.getRequestURI());
             singleSignOn.setRedirectToLoginPage(response);
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             return false;
         }
 
@@ -80,6 +81,7 @@ public class LoginServiceImpl implements LoginService {
         if (request.getServletPath().contains(ApiPrefix.API_V1_TOPIC_CREATE)) {
             Result<String> userResult = singleSignOn.checkBasicAuth(request);
             if (ValidateUtils.isNull(userResult) || userResult.failed()) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 return false;
             }
 
@@ -91,6 +93,7 @@ public class LoginServiceImpl implements LoginService {
         if (ValidateUtils.isBlank(username)) {
             // 未登录, 则返回false, 同时重定向到登录页面
             singleSignOn.setRedirectToLoginPage(response);
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return false;
         }
 
