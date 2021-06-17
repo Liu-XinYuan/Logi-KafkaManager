@@ -73,7 +73,8 @@ public class LoginServiceImpl implements LoginService {
 
         if (classRequestMappingValue.equals(ApiPrefix.API_V1_SSO_PREFIX)
                 || classRequestMappingValue.equals(ApiPrefix.API_V1_THIRD_PART_PREFIX)
-                || classRequestMappingValue.equals(ApiPrefix.GATEWAY_API_V1_PREFIX)) {
+                || classRequestMappingValue.equals(ApiPrefix.GATEWAY_API_V1_PREFIX)
+                || request.getServletPath().contains("/consumers/all/topics/all/consume-details")) {
             // 白名单接口直接true
             return true;
         }
