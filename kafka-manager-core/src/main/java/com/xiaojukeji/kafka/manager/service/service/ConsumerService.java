@@ -2,6 +2,7 @@ package com.xiaojukeji.kafka.manager.service.service;
 
 import com.xiaojukeji.kafka.manager.common.bizenum.OffsetLocationEnum;
 import com.xiaojukeji.kafka.manager.common.entity.Result;
+import com.xiaojukeji.kafka.manager.common.entity.ao.consumer.ConsumeSummaryDTO;
 import com.xiaojukeji.kafka.manager.common.entity.ao.consumer.ConsumerGroup;
 import com.xiaojukeji.kafka.manager.common.entity.ao.PartitionOffsetDTO;
 import com.xiaojukeji.kafka.manager.common.entity.ao.consumer.ConsumeDetailDTO;
@@ -36,6 +37,11 @@ public interface ConsumerService {
      * 查询消费详情
      */
     List<ConsumeDetailDTO> getConsumeDetail(ClusterDO clusterDO, String topicName, ConsumerGroup consumerGroup);
+
+    /**
+     * 查询消费详情
+     */
+    List<ConsumeSummaryDTO> getConsumeDetail(ClusterDO clusterDO);
 
     /**
      * 获取消费组消费的Topic列表

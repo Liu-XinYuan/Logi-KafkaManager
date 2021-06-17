@@ -1,7 +1,9 @@
 package com.xiaojukeji.kafka.manager.web.converters;
 
+import com.xiaojukeji.kafka.manager.common.entity.ao.consumer.ConsumeSummaryDTO;
 import com.xiaojukeji.kafka.manager.common.entity.ao.consumer.ConsumerGroup;
 import com.xiaojukeji.kafka.manager.common.entity.ao.consumer.ConsumerGroupSummary;
+import com.xiaojukeji.kafka.manager.common.entity.vo.normal.consumer.ConsumeSummaryVO;
 import com.xiaojukeji.kafka.manager.common.entity.vo.normal.consumer.ConsumerGroupDetailVO;
 import com.xiaojukeji.kafka.manager.common.entity.ao.consumer.ConsumeDetailDTO;
 import com.xiaojukeji.kafka.manager.common.entity.vo.normal.consumer.ConsumerGroupSummaryVO;
@@ -9,9 +11,8 @@ import com.xiaojukeji.kafka.manager.common.entity.vo.normal.consumer.ConsumerGro
 import com.xiaojukeji.kafka.manager.common.utils.ListUtils;
 import com.xiaojukeji.kafka.manager.common.utils.ValidateUtils;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author zengqiao
@@ -43,6 +44,31 @@ public class ConsumerModelConverter {
             consumerGroupDetailVOList.add(consumerGroupDetailVO);
         }
         return consumerGroupDetailVOList;
+    }
+    public static List<ConsumeSummaryVO> convert2ConsumerGroupDetailVO(List<ConsumeSummaryDTO> consumeSummaryDTOList) {
+        if (consumeSummaryDTOList == null || consumeSummaryDTOList.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        Map<String, ConsumeSummaryVO> consumeSummaryVOMap = new HashMap<>();
+
+        for (ConsumeSummaryDTO consumeSummaryDTO : consumeSummaryDTOList) {
+            ConsumeSummaryVO consumeSummaryVO;
+            if (consumeSummaryVOMap.containsKey(consumeSummaryDTO.getConsumerGroup())) {
+                consumeSummaryVO = consumeSummaryVOMap.get(consumeSummaryDTO.getConsumerGroup());
+            } else {
+                consumeSummaryVO = new ConsumeSummaryVO();
+            }
+
+            consumeSummaryVO.setConsumerGroup(consumeSummaryDTO.getConsumerGroup());
+            Long middleLag = consumeSummaryDTO.getOffset() - consumeSummaryDTO.getConsumeOffset();
+            consumeSummaryVO.getTopicLags().put(consumeSummaryDTO.getTopicName(), middleLag);
+            consumeSummaryVO.setLag(consumeSummaryVO.getLag() + middleLag);
+            consumeSummaryVOMap.put(consumeSummaryDTO.getConsumerGroup(), consumeSummaryVO);
+        }
+        List<ConsumeSummaryVO> collect = consumeSummaryVOMap.values().stream().collect(Collectors.toList());
+        Collections.sort(collect);
+        return collect;
     }
 
     public static List<ConsumerGroupVO> convert2ConsumerGroupVOList(List<ConsumerGroup> consumerGroupList) {

@@ -355,6 +355,40 @@ public class TopicServiceImpl implements TopicService {
     }
 
     @Override
+    public Map<TopicPartition, Long> getPartitionOffset(ClusterDO clusterDO, Set<String> topicNames, OffsetPosEnum offsetPosEnum) {
+        if (topicNames == null || topicNames.isEmpty()) {
+            return new HashMap<>(0);
+        }
+        List<TopicMetadata> topicList = PhysicalClusterMetadataManager.getTopicList(clusterDO.getId(), topicNames);
+        if (topicList == null || topicList.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        List<TopicPartition> topicPartitionList = new ArrayList<>();
+        for (TopicMetadata topicMetadata : topicList) {
+            for (Integer partitionId = 0; partitionId < topicMetadata.getPartitionNum(); ++partitionId) {
+                topicPartitionList.add(new TopicPartition(topicMetadata.getTopic(), partitionId));
+            }
+        }
+        Map<TopicPartition, Long> topicPartitionLongMap = new HashMap<>();
+        KafkaConsumer kafkaConsumer = null;
+        try {
+            kafkaConsumer = KafkaClientPool.borrowKafkaConsumerClient(clusterDO);
+            if ((offsetPosEnum.getCode() & OffsetPosEnum.END.getCode()) > 0) {
+                topicPartitionLongMap = kafkaConsumer.endOffsets(topicPartitionList);
+            } else if ((offsetPosEnum.getCode() & OffsetPosEnum.BEGINNING.getCode()) > 0) {
+                topicPartitionLongMap = kafkaConsumer.beginningOffsets(topicPartitionList);
+            }
+        } catch (Exception e) {
+            LOGGER.error("get topic endOffsets failed, clusterId:{} topicName:{}.",
+                    clusterDO.getId(), topicPartitionList.get(0).topic(), e);
+        } finally {
+            KafkaClientPool.returnKafkaConsumerClient(clusterDO.getId(), kafkaConsumer);
+        }
+        return topicPartitionLongMap;
+    }
+
+    @Override
     public List<TopicOverview> getTopicOverviewList(Long clusterId, Integer brokerId) {
         if (ValidateUtils.isNull(clusterId) || ValidateUtils.isNull(brokerId)) {
             return new ArrayList<>();

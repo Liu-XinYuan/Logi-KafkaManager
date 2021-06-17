@@ -5,6 +5,7 @@ import com.xiaojukeji.kafka.manager.common.bizenum.OffsetLocationEnum;
 import com.xiaojukeji.kafka.manager.common.entity.ResultStatus;
 import com.xiaojukeji.kafka.manager.common.entity.Result;
 import com.xiaojukeji.kafka.manager.common.entity.ao.consumer.ConsumeDetailDTO;
+import com.xiaojukeji.kafka.manager.common.entity.ao.consumer.ConsumeSummaryDTO;
 import com.xiaojukeji.kafka.manager.common.entity.ao.consumer.ConsumerGroup;
 import com.xiaojukeji.kafka.manager.common.entity.ao.consumer.ConsumerGroupSummary;
 import com.xiaojukeji.kafka.manager.common.entity.pojo.ClusterDO;
@@ -182,6 +183,38 @@ public class ConsumerServiceImpl implements ConsumerService {
         }
         return consumerGroupDetailDTOList;
     }
+
+    @Override
+    public List<ConsumeSummaryDTO> getConsumeDetail(ClusterDO clusterDO) {
+        List<ConsumeSummaryDTO> consumeDetailDTOList = getConsumerPartitionStateInBroker(clusterDO);
+
+        if (consumeDetailDTOList == null) {
+            logger.info("class=ConsumerServiceImpl||method=getConsumeDetail||msg=consumerGroupDetailDTOList is null!");
+            return null;
+        }
+
+        Set<String> topics = consumeDetailDTOList.stream().map(x -> x.getTopicName()).collect(Collectors.toSet());
+
+        Map<TopicPartition, Long> topicPartitionLongMap = topicService.getPartitionOffset(clusterDO, topics, OffsetPosEnum.END);
+        if (topicPartitionLongMap == null) {
+            return consumeDetailDTOList;
+        }
+        HashMap<String, Long> topicOffset = new HashMap<>();
+        for (TopicPartition topicPartition : topicPartitionLongMap.keySet()) {
+            topicOffset.compute(topicPartition.topic(), (k, v) -> {
+                return v == null ? topicPartitionLongMap.get(topicPartition) : v + topicPartitionLongMap.get(topicPartition);
+            });
+        }
+
+        for (ConsumeSummaryDTO consumeSummaryDTO : consumeDetailDTOList) {
+            Long endOffset = topicOffset.get(consumeSummaryDTO.getTopicName());
+            if (endOffset != null)
+                consumeSummaryDTO.setOffset(endOffset);
+        }
+
+        return consumeDetailDTOList;
+    }
+
 
     @Override
     public List<String> getConsumerGroupConsumedTopicList(Long clusterId, String consumerGroup, String location) {
@@ -373,6 +406,30 @@ public class ConsumerServiceImpl implements ConsumerService {
         return consumeDetailDTOList;
     }
 
+    private List<ConsumeSummaryDTO> getConsumerPartitionStateInBroker(ClusterDO clusterDO) {
+        List<ConsumerGroup> consumerGroupList = getConsumerGroupList(clusterDO.getId());
+        Map<String, Map<String, Long>> offsetByGroupAndTopicFromBroker = getOffsetByGroupAndTopicFromBroker(clusterDO, consumerGroupList);
+
+        List<ConsumeSummaryDTO> consumeDetailDTOList = new ArrayList<>();
+        for (String consumerGroup : offsetByGroupAndTopicFromBroker.keySet()) {
+            Map<String, Long> stringIntegerMap = offsetByGroupAndTopicFromBroker.get(consumerGroup);
+            for (String topicName : stringIntegerMap.keySet()) {
+                ConsumeSummaryDTO consumeSummaryDTO = new ConsumeSummaryDTO();
+
+                consumeSummaryDTO.setConsumerGroup(consumerGroup);
+                if (stringIntegerMap.get(topicName) != null) {
+                    consumeSummaryDTO.setConsumeOffset(stringIntegerMap.get(topicName));
+                }
+                consumeSummaryDTO.setTopicName(topicName);
+                consumeSummaryDTO.setClusterId(clusterDO.getId());
+
+                consumeDetailDTOList.add(consumeSummaryDTO);
+            }
+
+        }
+        return consumeDetailDTOList;
+    }
+
     private List<ConsumeDetailDTO> getConsumerPartitionStateInZK(ClusterDO clusterDO, TopicMetadata topicMetadata, ConsumerGroup consumerGroup) {
         ZkConfigImpl zkConfig = PhysicalClusterMetadataManager.getZKConfig(clusterDO.getId());
 
@@ -421,6 +478,36 @@ public class ConsumerServiceImpl implements ConsumerService {
             TopicPartition topicPartition = entry.getKey();
             if (topicPartition.topic().equals(topicName)) {
                 result.put(topicPartition.partition(), entry.getValue().toString());
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 根据group批量获取broker中的group中的各个消费者的offset
+     * groupId -> (topic->lag)
+     */
+    private Map<String, Map<String, Long>> getOffsetByGroupAndTopicFromBroker(ClusterDO clusterDO,
+                                                                              List<ConsumerGroup> consumerGroups) {
+        Map<String, Map<String, Long>> result = new HashMap<>();
+        AdminClient client = KafkaClientPool.getAdminClient(clusterDO.getId());
+        if (null == client) {
+            return result;
+        }
+
+        for (ConsumerGroup consumerGroup : consumerGroups) {
+            Map<TopicPartition, Object> offsetMap = JavaConversions.asJavaMap(client.listGroupOffsets(consumerGroup.getConsumerGroup()));
+            for (Map.Entry<TopicPartition, Object> entry : offsetMap.entrySet()) {
+                TopicPartition topicPartition = entry.getKey();
+                if (result.get(consumerGroup.getConsumerGroup()) == null) {
+                    result.put(consumerGroup.getConsumerGroup(), new HashMap<String, Long>());
+                }
+                Map<String, Long> map = result.get(consumerGroup.getConsumerGroup());
+                if (map.get(topicPartition.topic()) == null) {
+                    map.put(topicPartition.topic(), (Long) entry.getValue());
+                } else {
+                    map.put(topicPartition.topic(), (Long) entry.getValue() + map.get(topicPartition.topic()));
+                }
             }
         }
         return result;

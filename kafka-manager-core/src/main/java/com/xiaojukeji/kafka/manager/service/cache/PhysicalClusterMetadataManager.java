@@ -29,6 +29,7 @@ import org.springframework.stereotype.Service;
 import javax.annotation.PostConstruct;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * 物理集群元信息
@@ -217,6 +218,14 @@ public class PhysicalClusterMetadataManager {
             return null;
         }
         return metadataMap.get(topicName);
+    }
+
+    public static List<TopicMetadata> getTopicList(Long clusterId,Set<String> topics) {
+        Map<String, TopicMetadata> metadataMap = TOPIC_METADATA_MAP.get(clusterId);
+        if (metadataMap == null) {
+            return new ArrayList<>();
+        }
+        return metadataMap.values().stream().filter(x -> topics.contains(x.getTopic())).collect(Collectors.toList());
     }
 
     public static List<String> getTopicNameList(Long clusterId) {

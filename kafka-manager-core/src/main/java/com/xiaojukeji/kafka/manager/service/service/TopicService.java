@@ -17,6 +17,7 @@ import org.apache.kafka.common.TopicPartition;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Topic相关的接口
@@ -65,6 +66,11 @@ public interface TopicService {
      * 获取Topic的分区的offset
      */
     Map<TopicPartition, Long> getPartitionOffset(ClusterDO clusterDO, String topicName, OffsetPosEnum offsetPosEnum);
+
+    /**
+     * 获取Topic的分区的offset
+     */
+    Map<TopicPartition, Long> getPartitionOffset(ClusterDO clusterDO, Set<String> topicNames, OffsetPosEnum offsetPosEnum);
 
     /**
      * 获取Topic概览信息

@@ -6,8 +6,10 @@ import com.xiaojukeji.kafka.manager.common.entity.Result;
 import com.xiaojukeji.kafka.manager.common.entity.ResultStatus;
 import com.xiaojukeji.kafka.manager.common.entity.ao.PartitionOffsetDTO;
 import com.xiaojukeji.kafka.manager.common.entity.ao.consumer.ConsumeDetailDTO;
+import com.xiaojukeji.kafka.manager.common.entity.ao.consumer.ConsumeSummaryDTO;
 import com.xiaojukeji.kafka.manager.common.entity.ao.consumer.ConsumerGroup;
 import com.xiaojukeji.kafka.manager.common.entity.dto.normal.TopicOffsetResetDTO;
+import com.xiaojukeji.kafka.manager.common.entity.vo.normal.consumer.ConsumeSummaryVO;
 import com.xiaojukeji.kafka.manager.common.entity.vo.normal.consumer.ConsumerGroupDetailVO;
 import com.xiaojukeji.kafka.manager.common.entity.vo.normal.consumer.ConsumerGroupSummaryVO;
 import com.xiaojukeji.kafka.manager.common.utils.ValidateUtils;
@@ -109,6 +111,46 @@ public class NormalConsumerController {
             );
         } catch (Exception e) {
             LOGGER.error("get consume detail failed, consumerGroup:{}.", consumeGroup, e);
+        }
+        return Result.buildFrom(ResultStatus.OPERATION_FAILED);
+
+    }
+
+    @ApiOperation(value = "查询所有消费组的消费详情", notes = "")
+    @RequestMapping(value = "{clusterId}/consumers/all/topics/all/consume-details",
+            method = RequestMethod.GET)
+    @ResponseBody
+    public Result<List<ConsumeSummaryVO>> getConsumeDetail(
+            @PathVariable Long clusterId,
+            @RequestParam("location") String location,
+            @RequestParam(value = "isPhysicalClusterId", required = false) Boolean isPhysicalClusterId) {
+        if (ValidateUtils.isNull(location)) {
+
+            return Result.buildFrom(ResultStatus.PARAM_ILLEGAL);
+        }
+        Long physicalClusterId = logicalClusterMetadataManager.getPhysicalClusterId(clusterId, isPhysicalClusterId);
+
+        ClusterDO clusterDO = clusterService.getById(physicalClusterId);
+        if (ValidateUtils.isNull(clusterDO)) {
+            return Result.buildFrom(ResultStatus.CLUSTER_NOT_EXIST);
+        }
+
+        location = location.toLowerCase();
+        OffsetLocationEnum offsetStoreLocation = OffsetLocationEnum.getOffsetStoreLocation(location);
+        if (ValidateUtils.isNull(offsetStoreLocation)) {
+            return Result.buildFrom(ResultStatus.CG_LOCATION_ILLEGAL);
+        }
+
+        try {
+            List<ConsumeSummaryDTO> consumeDetailDTOList =
+                    consumerService.getConsumeDetail(clusterDO);
+            return new Result<>(
+                    ConsumerModelConverter.convert2ConsumerGroupDetailVO(
+                            consumeDetailDTOList
+                    )
+            );
+        } catch (Exception e) {
+            LOGGER.error("get consume detail failed, consumerGroup:all.", e);
         }
         return Result.buildFrom(ResultStatus.OPERATION_FAILED);
 
