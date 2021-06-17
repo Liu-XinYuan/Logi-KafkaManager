@@ -51,8 +51,8 @@ public class KafkaConsumerFactory extends BasePooledObjectFactory<KafkaConsumer>
         properties.setProperty(
                 ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
                 "org.apache.kafka.common.serialization.StringDeserializer");
-        properties.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, 10000);
-        properties.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, 15000);
+        properties.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, 100000);
+        properties.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, 150000);
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         if (ValidateUtils.isBlank(clusterDO.getSecurityProperties())) {
             return properties;
