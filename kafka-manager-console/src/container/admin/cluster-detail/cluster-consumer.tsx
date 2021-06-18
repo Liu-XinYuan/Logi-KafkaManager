@@ -25,19 +25,19 @@ export class ClusterConsumer extends SearchAndFilterContainer {
     dataIndex: 'consumerGroup',
     key: 'consumerGroup',
     width: '70%',
-    sorter: (a: IGroupLag, b: IGroupLag) => a.consumerGroup.charCodeAt(0) - b.consumerGroup.charCodeAt(0),
     render: (text: string) => <Tooltip placement="bottomLeft" title={text} >{text}</Tooltip>,
   }, {
     title: '消费组Lag',
     dataIndex: 'lag',
     key: 'lag',
     width: '20%',
+    sorter: (a: IGroupLag, b: IGroupLag) => a.lag - b.lag,
     render: (t: number) => t,
   }, {
     title: '详情',
     key: 'detail-lag',
     width: '10%',
-    render: (t: string, item: IGroupLag) => {
+    render: (item: IGroupLag) => {
       return (<a onClick={() => this.getConsumeDetails(item)}>消费详情</a>);
     },
   }];
@@ -80,19 +80,26 @@ export class ClusterConsumer extends SearchAndFilterContainer {
 
   public render() {
     let details: any[];
-    details = this.consumerDetails ?  Object.keys(this.consumerDetails).map((ele) => {
+    details = this.consumerDetails ?  Object.keys(this.consumerDetails).map((topic) => {
       return {
-        key: this.consumerDetails[ele],
-        topicName: ele
+        topicName: topic,
+        lag: this.consumerDetails[topic]
       };
     }) : [];
 
     const consumptionColumns = [{
       title: '消费的Topic列表',
-      dataIndex: 'topicName'
+      dataIndex: 'topicName',
+      key: 'topicName',
+      render: (text: string) => text
     }, {
       title: 'group-topic Lag',
-      dataIndex: 'key'
+      dataIndex: 'lag',
+      key: 'lag',
+      sorter: (a: any, b: any) => {
+        return a['lag'] - b['lag']
+      },
+      render: (t: number) => t
     }];
 
     return (
