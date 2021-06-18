@@ -11,9 +11,9 @@ spring:
     name: kafkamanager
   datasource:
     kafka-manager:
-      jdbc-url: jdbc:mysql://localhost:3306/logi_kafka_manager?characterEncoding=UTF-8&useSSL=false&serverTimezone=GMT%2B8
-      username: root
-      password: 123456
+      jdbc-url: jdbc:mysql://10.1.53.153:3306/logi_kafka_manager?characterEncoding=UTF-8&useSSL=false&serverTimezone=GMT%2B8
+      username: km
+      password: km123456
       driver-class-name: com.mysql.jdbc.Driver
   main:
     allow-bean-definition-overriding: true
@@ -49,15 +49,15 @@ task:
 
 account:
   ldap:
-    enabled: false
-    url: ldap://127.0.0.1:389/
-    basedn: dc=tsign,dc=cn
+    enabled: true
+    url: ldap://ipatest.yonghui.cn:389/
+    basedn: dc=YONGHUI,dc=cn
     factory: com.sun.jndi.ldap.LdapCtxFactory
-    filter: sAMAccountName
+    filter: uid
     security:
       authentication: simple
-      principal: cn=admin,dc=tsign,dc=cn
-      credentials: admin
+      principal: uid=admin,cn=users,cn=accounts,dc=YONGHUI,dc=cn
+      credentials: 22222222
     auth-user-registration: true
     auth-user-registration-role: normal
 
