@@ -3,7 +3,7 @@ import * as React from 'react';
 import { Table, Modal, Tooltip } from 'component/antd';
 import { observer } from 'mobx-react';
 import Url from 'lib/url-parser';
-import { IOffset, IXFormWrapper } from 'types/base-type';
+import {IGroupLag, INumberMap, IOffset, IXFormWrapper} from 'types/base-type';
 import { SearchAndFilterContainer } from 'container/search-filter';
 import { pagination } from 'constants/table';
 import { admin } from 'store/admin';
@@ -13,7 +13,7 @@ import './index.less';
 @observer
 export class ClusterConsumer extends SearchAndFilterContainer {
   public clusterId: number;
-  public consumerDetails = [] as string[];
+  public consumerDetails: INumberMap;
 
   public state = {
     searchKey: '',
@@ -25,19 +25,19 @@ export class ClusterConsumer extends SearchAndFilterContainer {
     dataIndex: 'consumerGroup',
     key: 'consumerGroup',
     width: '70%',
-    sorter: (a: IOffset, b: IOffset) => a.consumerGroup.charCodeAt(0) - b.consumerGroup.charCodeAt(0),
+    sorter: (a: IGroupLag, b: IGroupLag) => a.consumerGroup.charCodeAt(0) - b.consumerGroup.charCodeAt(0),
     render: (text: string) => <Tooltip placement="bottomLeft" title={text} >{text}</Tooltip>,
   }, {
-    title: 'Location',
-    dataIndex: 'location',
-    key: 'location',
+    title: '消费组Lag',
+    dataIndex: 'lag',
+    key: 'lag',
     width: '20%',
-    render: (t: string) => t.toLowerCase(),
+    render: (t: number) => t,
   }, {
-    title: '操作',
-    key: 'operation',
+    title: '详情',
+    key: 'detail-lag',
     width: '10%',
-    render: (t: string, item: IOffset) => {
+    render: (t: string, item: IGroupLag) => {
       return (<a onClick={() => this.getConsumeDetails(item)}>消费详情</a>);
     },
   }];
@@ -49,11 +49,10 @@ export class ClusterConsumer extends SearchAndFilterContainer {
     this.clusterId = Number(url.search.clusterId);
   }
 
-  public getConsumeDetails(record: IOffset) {
-    getConsumerDetails(this.clusterId, record.consumerGroup, record.location).then((data: string[]) => {
-      this.consumerDetails = data;
+  public getConsumeDetails(record: IGroupLag) {
+      this.consumerDetails = record.topicLags;
       this.setState({ detailsVisible: true });
-    });
+
   }
 
   public handleDetailsOk() {
@@ -64,14 +63,13 @@ export class ClusterConsumer extends SearchAndFilterContainer {
     this.setState({ detailsVisible: false });
   }
 
-  public getData<T extends IOffset>(origin: T[]) {
+  public getData<T extends IGroupLag>(origin: T[]) {
     let data: T[] = origin;
     let { searchKey } = this.state;
     searchKey = (searchKey + '').trim().toLowerCase();
 
-    data = searchKey ? origin.filter((item: IOffset) =>
-      (item.consumerGroup !== undefined && item.consumerGroup !== null) && item.consumerGroup.toLowerCase().includes(searchKey as string)
-      || (item.location !== undefined && item.location !== null) && item.location.toLowerCase().includes(searchKey as string),
+    data = searchKey ? origin.filter((item: IGroupLag) =>
+      (item.consumerGroup !== undefined && item.consumerGroup !== null) && item.consumerGroup.toLowerCase().includes(searchKey as string),
     ) : origin;
     return data;
   }
@@ -82,17 +80,19 @@ export class ClusterConsumer extends SearchAndFilterContainer {
 
   public render() {
     let details: any[];
-    details = this.consumerDetails ? this.consumerDetails.map((ele, index) => {
+    details = this.consumerDetails ?  Object.keys(this.consumerDetails).map((ele) => {
       return {
-        key: index,
-        topicName: ele,
+        key: this.consumerDetails[ele],
+        topicName: ele
       };
     }) : [];
 
     const consumptionColumns = [{
       title: '消费的Topic列表',
-      dataIndex: 'topicName',
-      key: 'topicName',
+      dataIndex: 'topicName'
+    }, {
+      title: 'group-topic Lag',
+      dataIndex: 'key'
     }];
 
     return (

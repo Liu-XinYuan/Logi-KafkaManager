@@ -6,6 +6,10 @@ export interface IStringMap {
   [key: string]: string;
 }
 
+export  interface INumberMap {
+  [key: string]: number;
+}
+
 export interface ILeftMenu {
   href: string;
   i: string;
@@ -200,6 +204,13 @@ export interface IOffset {
   offsetList?: [];
   topicName: string;
   timestamp: number;
+  key?: number;
+}
+
+export interface IGroupLag {
+  consumerGroup: string;
+  lag: number;
+  topicLags: INumberMap;
   key?: number;
 }
 

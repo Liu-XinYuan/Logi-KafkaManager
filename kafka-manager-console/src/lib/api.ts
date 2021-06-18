@@ -546,7 +546,7 @@ export const getClusterBroker = (clusterId: number) => {
 };
 
 export const getClusterConsumer = (clusterId: number) => {
-  return fetch(`/rd/${clusterId}/consumer-groups`);
+  return fetch(`/normal/${clusterId}/consumers/all/topics/all/consume-details?location=broker&isPhysicalClusterId=true`);
 };
 
 export const getConsumerDetails = (clusterId: number, consumerGroup: string, location: string) => {

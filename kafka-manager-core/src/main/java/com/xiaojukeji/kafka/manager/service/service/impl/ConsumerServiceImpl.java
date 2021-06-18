@@ -407,8 +407,8 @@ public class ConsumerServiceImpl implements ConsumerService {
     }
 
     private List<ConsumeSummaryDTO> getConsumerPartitionStateInBroker(ClusterDO clusterDO) {
-        List<ConsumerGroup> consumerGroupList = getConsumerGroupList(clusterDO.getId());
-        Map<String, Map<String, Long>> offsetByGroupAndTopicFromBroker = getOffsetByGroupAndTopicFromBroker(clusterDO, consumerGroupList);
+        Set<String> groups = ConsumerMetadataCache.getGroupInBrokerMap(clusterDO.getId());
+        Map<String, Map<String, Long>> offsetByGroupAndTopicFromBroker = getOffsetByGroupAndTopicFromBroker(clusterDO, groups);
 
         List<ConsumeSummaryDTO> consumeDetailDTOList = new ArrayList<>();
         for (String consumerGroup : offsetByGroupAndTopicFromBroker.keySet()) {
@@ -488,21 +488,21 @@ public class ConsumerServiceImpl implements ConsumerService {
      * groupId -> (topic->lag)
      */
     private Map<String, Map<String, Long>> getOffsetByGroupAndTopicFromBroker(ClusterDO clusterDO,
-                                                                              List<ConsumerGroup> consumerGroups) {
+                                                                              Set<String> consumerGroups) {
         Map<String, Map<String, Long>> result = new HashMap<>();
         AdminClient client = KafkaClientPool.getAdminClient(clusterDO.getId());
         if (null == client) {
             return result;
         }
 
-        for (ConsumerGroup consumerGroup : consumerGroups) {
-            Map<TopicPartition, Object> offsetMap = JavaConversions.asJavaMap(client.listGroupOffsets(consumerGroup.getConsumerGroup()));
+        for (String consumerGroup : consumerGroups) {
+            Map<TopicPartition, Object> offsetMap = JavaConversions.asJavaMap(client.listGroupOffsets(consumerGroup));
             for (Map.Entry<TopicPartition, Object> entry : offsetMap.entrySet()) {
                 TopicPartition topicPartition = entry.getKey();
-                if (result.get(consumerGroup.getConsumerGroup()) == null) {
-                    result.put(consumerGroup.getConsumerGroup(), new HashMap<String, Long>());
+                if (result.get(consumerGroup) == null) {
+                    result.put(consumerGroup, new HashMap<String, Long>());
                 }
-                Map<String, Long> map = result.get(consumerGroup.getConsumerGroup());
+                Map<String, Long> map = result.get(consumerGroup);
                 if (map.get(topicPartition.topic()) == null) {
                     map.put(topicPartition.topic(), (Long) entry.getValue());
                 } else {

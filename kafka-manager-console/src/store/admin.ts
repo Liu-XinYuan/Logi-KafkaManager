@@ -1,5 +1,43 @@
 import { observable, action } from 'mobx';
-import { INewBulidEnums, ILabelValue, IClusterReal, IOptionType, IClusterMetrics, IClusterTopics, IKafkaFiles, IMetaData, IConfigure, IConfigGateway, IBrokerData, IOffset, IController, IBrokersBasicInfo, IBrokersStatus, IBrokersTopics, IBrokersPartitions, IBrokersAnalysis, IAnalysisTopicVO, IBrokersMetadata, IBrokersRegions, IThrottles, ILogicalCluster, INewRegions, INewLogical, ITaskManage, IPartitionsLocation, ITaskType, ITasksEnums, ITasksMetaData, ITaskStatusDetails, IKafkaRoles, IEnumsMap, IStaffSummary, IBill, IBillDetail } from 'types/base-type';
+import {
+  INewBulidEnums,
+  ILabelValue,
+  IClusterReal,
+  IOptionType,
+  IClusterMetrics,
+  IClusterTopics,
+  IKafkaFiles,
+  IMetaData,
+  IConfigure,
+  IConfigGateway,
+  IBrokerData,
+  IOffset,
+  IController,
+  IBrokersBasicInfo,
+  IBrokersStatus,
+  IBrokersTopics,
+  IBrokersPartitions,
+  IBrokersAnalysis,
+  IAnalysisTopicVO,
+  IBrokersMetadata,
+  IBrokersRegions,
+  IThrottles,
+  ILogicalCluster,
+  INewRegions,
+  INewLogical,
+  ITaskManage,
+  IPartitionsLocation,
+  ITaskType,
+  ITasksEnums,
+  ITasksMetaData,
+  ITaskStatusDetails,
+  IKafkaRoles,
+  IEnumsMap,
+  IStaffSummary,
+  IBill,
+  IBillDetail,
+  IGroupLag
+} from 'types/base-type';
 import {
   deleteCluster,
   getBasicInfo,
@@ -119,7 +157,7 @@ class Admin {
   public clusterBroker: IBrokerData[] = [];
 
   @observable
-  public consumerData: IOffset[] = [];
+  public consumerData: IGroupLag[] = [];
 
   @observable
   public brokersBasicInfo: IBrokersBasicInfo;
@@ -162,7 +200,7 @@ class Admin {
 
    @observable
   public filtercontrollerCandidate: string = '';
-  
+
   @observable
   public brokersPartitions: IBrokersPartitions[] = [];
 
@@ -355,7 +393,7 @@ class Admin {
   }
 
   @action.bound
-  public setClusterConsumer(data: IOffset[]) {
+  public setClusterConsumer(data: IGroupLag[]) {
     this.consumerData = data ? data.map((item, index) => {
       item.key = index;
       return item;
