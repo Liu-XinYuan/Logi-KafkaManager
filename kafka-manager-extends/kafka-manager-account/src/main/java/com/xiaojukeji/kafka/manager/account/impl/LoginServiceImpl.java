@@ -81,12 +81,9 @@ public class LoginServiceImpl implements LoginService {
 
         if (request.getServletPath().contains(ApiPrefix.API_V1_TOPIC_CREATE)) {
             Result<String> userResult = singleSignOn.checkBasicAuth(request);
-            if (ValidateUtils.isNull(userResult) || userResult.failed()) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                return false;
+            if (!ValidateUtils.isNull(userResult) && !userResult.failed()) {
+                return true;
             }
-
-            return true;
         }
 
 
