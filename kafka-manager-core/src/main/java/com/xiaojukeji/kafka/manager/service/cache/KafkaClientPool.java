@@ -132,7 +132,7 @@ public class KafkaClientPool {
         }
 
         try {
-            return objectPool.borrowObject(3000);
+            return objectPool.borrowObject(30000);
         } catch (Exception e) {
             LOGGER.error("borrow kafka consumer client failed, clusterDO:{}.", clusterDO, e);
         }
