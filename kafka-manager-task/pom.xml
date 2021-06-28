@@ -54,5 +54,10 @@
             <artifactId>spring-context</artifactId>
             <version>${spring-version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient_pushgateway</artifactId>
+        </dependency>
     </dependencies>
 </project>

@@ -30,7 +30,7 @@ public class FlushBKConsumerGroupMetadata {
     @Autowired
     private ClusterService clusterService;
 
-    @Scheduled(cron="15 0/1 * * * ?")
+    @Scheduled(cron="0/5 * * * * ?")
     public void schedule() {
         List<ClusterDO> doList = clusterService.list();
 

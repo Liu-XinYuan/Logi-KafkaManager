@@ -25,7 +25,7 @@ public class FlushClusterMetadata {
     @Autowired
     private PhysicalClusterMetadataManager physicalClusterMetadataManager;
 
-    @Scheduled(cron="0/30 * * * * ?")
+    @Scheduled(cron="0/10 * * * * ?")
     public void flush() {
         Map<Long, ClusterDO> dbClusterMap = clusterService.list().stream().collect(Collectors.toMap(ClusterDO::getId, Function.identity(), (key1, key2) -> key2));
 

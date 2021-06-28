@@ -32,7 +32,7 @@ public class FlushZKConsumerGroupMetadata {
     @Autowired
     private ClusterService clusterService;
 
-    @Scheduled(cron="35 0/1 * * * ?")
+    @Scheduled(cron="0/5 * * * * ?")
     public void schedule() {
         List<ClusterDO> doList = clusterService.list();
 

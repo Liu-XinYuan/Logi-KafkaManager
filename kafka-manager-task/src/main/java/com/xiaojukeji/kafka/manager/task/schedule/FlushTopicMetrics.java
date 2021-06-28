@@ -30,7 +30,7 @@ public class FlushTopicMetrics {
     @Autowired
     private ClusterService clusterService;
 
-    @Scheduled(cron="5 0/1 * * * ?")
+    @Scheduled(cron="0/5 * * * * ?")
     public void flushTopicMetrics() {
         long startTime = System.currentTimeMillis();
         LOGGER.info("flush topic-metrics start.");

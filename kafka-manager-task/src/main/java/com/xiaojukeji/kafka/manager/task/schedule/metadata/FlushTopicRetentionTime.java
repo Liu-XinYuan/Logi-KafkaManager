@@ -26,7 +26,7 @@ public class FlushTopicRetentionTime {
     @Autowired
     private ClusterService clusterService;
 
-    @Scheduled(cron="25 0/1 * * * ?")
+    @Scheduled(cron="0/5 * * * * ?")
     public void flush() {
         List<ClusterDO> doList = clusterService.list();
         for (ClusterDO clusterDO: doList) {

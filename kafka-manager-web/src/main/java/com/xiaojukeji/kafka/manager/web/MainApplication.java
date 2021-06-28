@@ -1,5 +1,7 @@
 package com.xiaojukeji.kafka.manager.web;
 
+import io.prometheus.client.spring.boot.EnablePrometheusEndpoint;
+import io.prometheus.client.spring.boot.EnableSpringBootMetricsCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;

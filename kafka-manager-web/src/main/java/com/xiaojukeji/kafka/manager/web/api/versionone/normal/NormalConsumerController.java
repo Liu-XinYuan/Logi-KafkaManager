@@ -14,6 +14,7 @@ import com.xiaojukeji.kafka.manager.common.entity.vo.normal.consumer.ConsumerGro
 import com.xiaojukeji.kafka.manager.common.entity.vo.normal.consumer.ConsumerGroupSummaryVO;
 import com.xiaojukeji.kafka.manager.common.utils.ValidateUtils;
 import com.xiaojukeji.kafka.manager.common.entity.pojo.ClusterDO;
+import com.xiaojukeji.kafka.manager.service.cache.KafkaMetricsCache;
 import com.xiaojukeji.kafka.manager.service.cache.LogicalClusterMetadataManager;
 import com.xiaojukeji.kafka.manager.service.service.ClusterService;
 import com.xiaojukeji.kafka.manager.service.service.ConsumerService;
@@ -143,7 +144,7 @@ public class NormalConsumerController {
 
         try {
             List<ConsumeSummaryDTO> consumeDetailDTOList =
-                    consumerService.getConsumeDetail(clusterDO);
+                    KafkaMetricsCache.getAllConsumerMetricsToCache(clusterId);
             return new Result<>(
                     ConsumerModelConverter.convert2ConsumerGroupDetailVO(
                             consumeDetailDTOList
