@@ -5,6 +5,7 @@ import com.xiaojukeji.kafka.manager.common.entity.pojo.ClusterDO;
 import com.xiaojukeji.kafka.manager.common.utils.ValidateUtils;
 import com.xiaojukeji.kafka.manager.common.utils.factory.KafkaConsumerFactory;
 import kafka.admin.AdminClient;
+import org.apache.commons.pool2.impl.AbandonedConfig;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -92,10 +93,14 @@ public class KafkaClientPool {
             config.setMaxIdle(24);
             config.setMinIdle(24);
             config.setMaxTotal(24);
-            KAFKA_CONSUMER_POOL.put(
-                    clusterDO.getId(),
-                    new GenericObjectPool<KafkaConsumer>(new KafkaConsumerFactory(clusterDO), config)
-            );
+            AbandonedConfig abandonedConfig = new AbandonedConfig();
+            abandonedConfig.setRemoveAbandonedOnMaintenance(true); //在Maintenance的时候检查是否有泄漏
+            abandonedConfig.setRemoveAbandonedOnBorrow(true); //borrow 的时候检查泄漏
+            abandonedConfig.setRemoveAbandonedTimeout(30); //如果一个对象borrow之后30秒还没有返还给pool，认为是泄漏的对象
+            GenericObjectPool<KafkaConsumer> pool = new GenericObjectPool<KafkaConsumer>(new KafkaConsumerFactory(clusterDO), config);
+            pool.setAbandonedConfig(abandonedConfig);
+            pool.setTimeBetweenEvictionRunsMillis(50000);
+            KAFKA_CONSUMER_POOL.put(clusterDO.getId(), pool);
         } catch (Exception e) {
             LOGGER.error("create kafka consumer pool failed, clusterDO:{}.", clusterDO, e);
         } finally {
