@@ -5,6 +5,7 @@ import com.xiaojukeji.kafka.manager.common.entity.pojo.ClusterDO;
 import com.xiaojukeji.kafka.manager.common.utils.ValidateUtils;
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
+import org.apache.commons.pool2.PooledObjectState;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -40,6 +41,15 @@ public class KafkaConsumerFactory extends BasePooledObjectFactory<KafkaConsumer>
             return;
         }
         kafkaConsumer.close();
+        p.invalidate();
+    }
+
+    @Override
+    public void activateObject(PooledObject<KafkaConsumer> p) throws Exception {
+        super.activateObject(p);
+        if (p.getObject() != null && p.getState() == PooledObjectState.INVALID) {
+            p.getObject().wakeup();
+        }
     }
 
     private static Properties createKafkaConsumerProperties(ClusterDO clusterDO) {

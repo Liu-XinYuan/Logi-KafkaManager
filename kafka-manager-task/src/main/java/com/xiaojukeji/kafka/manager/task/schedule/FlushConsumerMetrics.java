@@ -48,7 +48,8 @@ public class FlushConsumerMetrics {
         try {
             List<ConsumeSummaryDTO> consumeDetailDTOList =
                     consumerService.getConsumeDetail(clusterDO);
-            KafkaMetricsCache.putConsumerMetricsToCache(clusterId, consumeDetailDTOList);
+            if (consumeDetailDTOList.size() > 0 && consumeDetailDTOList.get(0).getOffset() - consumeDetailDTOList.get(0).getConsumeOffset() >= 0)
+                KafkaMetricsCache.putConsumerMetricsToCache(clusterId, consumeDetailDTOList);
         } catch (Exception e) {
             LOGGER.error("get consume detail failed, consumerGroup:all.", e);
         }

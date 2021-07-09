@@ -28,10 +28,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
 /**
- * @author zengqiao
+ * @author zengqiao consumergroup metrics默认吐到n9e，由于没有启用夜莺，这个task直接关闭
  * @date 20/9/14
  */
-@CustomScheduled(name = "newCollectAndPublishCGData", cron = "30 0/1 * * * *", threadNum = 10)
+//@CustomScheduled(name = "newCollectAndPublishCGData", cron = "30 0/1 * * * *", threadNum = 10)
 public class CollectAndPublishCGData extends AbstractScheduledTask<ClusterDO> {
     private final static Logger LOGGER = LoggerFactory.getLogger(LogConstant.SCHEDULED_TASK_LOGGER);
 

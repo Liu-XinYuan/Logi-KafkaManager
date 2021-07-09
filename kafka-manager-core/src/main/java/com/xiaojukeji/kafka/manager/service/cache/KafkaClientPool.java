@@ -91,7 +91,7 @@ public class KafkaClientPool {
             }
             GenericObjectPoolConfig config = new GenericObjectPoolConfig();
             config.setMaxIdle(24);
-            config.setMinIdle(24);
+            config.setMinIdle(1);
             config.setMaxTotal(24);
             AbandonedConfig abandonedConfig = new AbandonedConfig();
             abandonedConfig.setRemoveAbandonedOnMaintenance(true); //在Maintenance的时候检查是否有泄漏
