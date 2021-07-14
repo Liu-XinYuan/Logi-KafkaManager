@@ -1,18 +1,26 @@
 package com.xiaojukeji.kafka.manager.service.cache;
 
 import com.alibaba.fastjson.JSONObject;
+import com.xiaojukeji.kafka.manager.common.constant.Constant;
 import com.xiaojukeji.kafka.manager.common.entity.pojo.ClusterDO;
 import com.xiaojukeji.kafka.manager.common.utils.ValidateUtils;
 import com.xiaojukeji.kafka.manager.common.utils.factory.KafkaConsumerFactory;
-import kafka.admin.AdminClient;
+
 import org.apache.commons.pool2.impl.AbandonedConfig;
+
+import kafka.zk.AdminZkClient;
+import kafka.zk.KafkaZkClient;
+
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.security.JaasUtils;
+import org.apache.kafka.common.utils.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,6 +41,10 @@ public class KafkaClientPool {
      * AdminClient
      */
     private static Map<Long, AdminClient> AdminClientMap = new ConcurrentHashMap<>();
+
+    private static Map<Long, AdminZkClient> AdminZkClientMap = new ConcurrentHashMap<>();
+
+    private static Map<Long, KafkaZkClient> KafkaZkClientMap = new ConcurrentHashMap<>();
 
     private static Map<Long, KafkaProducer<String, String>> KAFKA_PRODUCER_MAP = new ConcurrentHashMap<>();
 
@@ -182,6 +194,62 @@ public class KafkaClientPool {
             lock.unlock();
         }
         return AdminClientMap.get(clusterId);
+    }
+
+    public static AdminZkClient getAdminZkClient(Long clusterId) {
+        AdminZkClient adminZkClient = AdminZkClientMap.get(clusterId);
+        if (adminZkClient != null) {
+            return adminZkClient;
+        }
+        ClusterDO clusterDO = PhysicalClusterMetadataManager.getClusterFromCache(clusterId);
+        if (clusterDO == null) {
+            return null;
+        }
+
+        lock.lock();
+        try {
+            adminZkClient = AdminZkClientMap.get(clusterId);
+            if (adminZkClient != null) {
+                return adminZkClient;
+            }
+            KafkaZkClient kafkaZkClient = KafkaZkClientMap.get(clusterId);
+            if(kafkaZkClient == null){
+                kafkaZkClient = KafkaZkClient.apply(clusterDO.getZookeeper(), JaasUtils.isZkSecurityEnabled(),Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS, Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS, 1000, Time.SYSTEM, "kafka.server", "SessionExpireListener", null);
+                KafkaZkClientMap.put(clusterId,kafkaZkClient);
+            }
+            AdminZkClientMap.put(clusterId, new AdminZkClient(kafkaZkClient));
+        } catch (Exception e) {
+            LOGGER.error("create kafka admin zk client failed, clusterId:{}.", clusterId, e);
+        } finally {
+            lock.unlock();
+        }
+        return AdminZkClientMap.get(clusterId);
+    }
+
+    public static KafkaZkClient getKafkaZkClient(Long clusterId) {
+        KafkaZkClient kafkaZkClient = KafkaZkClientMap.get(clusterId);
+        if (kafkaZkClient != null) {
+            return kafkaZkClient;
+        }
+        ClusterDO clusterDO = PhysicalClusterMetadataManager.getClusterFromCache(clusterId);
+        if (clusterDO == null) {
+            return null;
+        }
+
+        lock.lock();
+        try {
+            kafkaZkClient = KafkaZkClientMap.get(clusterId);
+            if (kafkaZkClient != null) {
+                return kafkaZkClient;
+            }
+                kafkaZkClient = KafkaZkClient.apply(clusterDO.getZookeeper(), JaasUtils.isZkSecurityEnabled(),Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS, Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS, 1000, Time.SYSTEM, "kafka.server", "SessionExpireListener", null);
+                KafkaZkClientMap.put(clusterId,kafkaZkClient);
+        } catch (Exception e) {
+            LOGGER.error("create kafka  zk client failed, clusterId:{}.", clusterId, e);
+        } finally {
+            lock.unlock();
+        }
+        return KafkaZkClientMap.get(clusterId);
     }
 
     public static void closeAdminClient(ClusterDO cluster) {

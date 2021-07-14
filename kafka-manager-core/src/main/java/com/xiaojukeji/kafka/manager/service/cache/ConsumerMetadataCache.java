@@ -2,7 +2,7 @@ package com.xiaojukeji.kafka.manager.service.cache;
 
 import com.xiaojukeji.kafka.manager.common.bizenum.OffsetLocationEnum;
 import com.xiaojukeji.kafka.manager.common.entity.ConsumerMetadata;
-import kafka.admin.AdminClient;
+import org.apache.kafka.clients.admin.ConsumerGroupDescription;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,7 +47,7 @@ public class ConsumerMetadataCache {
         return consumerMetadata.getConsumerGroupSet();
     }
 
-    public static AdminClient.ConsumerGroupSummary getConsumerGroupSummary(Long clusterId, String consumerGroup) {
+    public static ConsumerGroupDescription getConsumerGroupSummary(Long clusterId, String consumerGroup) {
         ConsumerMetadata consumerMetadata = CG_METADATA_IN_BK_MAP.get(clusterId);
         if (consumerMetadata == null) {
             return null;

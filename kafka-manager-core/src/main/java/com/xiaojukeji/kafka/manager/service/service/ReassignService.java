@@ -9,8 +9,9 @@ import com.xiaojukeji.kafka.manager.common.entity.dto.op.reassign.ReassignExecDT
 import com.xiaojukeji.kafka.manager.common.entity.dto.op.reassign.ReassignExecSubDTO;
 import com.xiaojukeji.kafka.manager.common.entity.dto.op.reassign.ReassignTopicDTO;
 import com.xiaojukeji.kafka.manager.common.entity.pojo.ReassignTaskDO;
-import kafka.common.TopicAndPartition;
-import kafka.utils.ZkUtils;
+import kafka.zk.KafkaZkClient;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.common.TopicPartition;
 
 import java.util.List;
 import java.util.Map;
@@ -33,9 +34,9 @@ public interface ReassignService {
 
     Result<List<ReassignStatus>> getReassignStatus(Long taskId);
 
-    Map<TopicAndPartition, TaskStatusReassignEnum> verifyAssignment(String zkAddr, String reassignmentJson);
+    Map<TopicPartition, TaskStatusReassignEnum> verifyAssignment(Long clusterId, String reassignmentJson);
 
-    Map<TopicAndPartition, TaskStatusReassignEnum> verifyAssignment(ZkUtils zkUtils, String reassignmentJson);
+    Map<TopicPartition, TaskStatusReassignEnum> verifyAssignment(AdminClient adminClient, KafkaZkClient zkClient, String reassignmentJson);
 
 
 }

@@ -5,13 +5,15 @@ import com.xiaojukeji.kafka.manager.common.constant.Constant;
 import com.xiaojukeji.kafka.manager.common.entity.pojo.ClusterDO;
 import com.xiaojukeji.kafka.manager.common.utils.ValidateUtils;
 import com.xiaojukeji.kafka.manager.common.zookeeper.ZkPathUtil;
+import com.xiaojukeji.kafka.manager.service.cache.KafkaClientPool;
 import kafka.admin.ReassignPartitionsCommand;
-import kafka.common.TopicAndPartition;
-import kafka.utils.ZkUtils;
+import kafka.zk.KafkaZkClient;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.security.JaasUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import scala.collection.JavaConverters;
+import scala.collection.Map$;
 import scala.collection.Seq;
 
 import java.util.*;
@@ -29,45 +31,36 @@ public class TopicReassignUtils {
                                                   String topicName,
                                                   List<Integer> partitionIdList,
                                                   List<Integer> brokerIdList) {
-        ZkUtils zkUtils = null;
         try {
-            zkUtils = ZkUtils.apply(clusterDO.getZookeeper(),
-                    Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS,
-                    Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS,
-                    JaasUtils.isZkSecurityEnabled());
-            if (zkUtils.pathExists(ZkPathUtil.REASSIGN_PARTITIONS_ROOT_NODE)) {
+            KafkaZkClient kafkaZkClient = KafkaClientPool.getKafkaZkClient(clusterDO.getId());
+            if (kafkaZkClient.pathExists(ZkPathUtil.REASSIGN_PARTITIONS_ROOT_NODE)) {
                 // 任务已经存在, 不知道是谁弄的
                 return null;
             }
 
             // 生成迁移JSON
-            return generateReassignmentJson(zkUtils, topicName, partitionIdList, brokerIdList);
+            return generateReassignmentJson(kafkaZkClient, topicName, partitionIdList, brokerIdList);
         } catch (Throwable t) {
             LOGGER.error("generate assignment json failed, clusterId:{} topicName:{} partitions:{} brokers:{}."
                     , clusterDO.getId(), topicName, partitionIdList, brokerIdList, t);
-        } finally {
-            if (zkUtils != null) {
-                zkUtils.close();
-            }
-            zkUtils = null;
         }
         return null;
     }
 
-    private static String generateReassignmentJson(ZkUtils zkUtils,
+    private static String generateReassignmentJson(KafkaZkClient zkClient,
                                                    String topicName,
                                                    List<Integer> partitionIdList,
                                                    List<Integer> brokerIdList) {
-        Map<TopicAndPartition, Seq<Object>> reassignMap = createReassignmentMap(
-                zkUtils,
+        Map<TopicPartition, Seq<Object>> reassignMap = createReassignmentMap(
+                zkClient,
                 topicName,
                 new ArrayList<>(brokerIdList)
         );
 
         if (!ValidateUtils.isEmptyList(partitionIdList)) {
-            Iterator<Map.Entry<TopicAndPartition, Seq<Object>>> it = reassignMap.entrySet().iterator();
+            Iterator<Map.Entry<TopicPartition, Seq<Object>>> it = reassignMap.entrySet().iterator();
             while (it.hasNext()) {
-                Map.Entry<TopicAndPartition, Seq<Object>> entry = it.next();
+                Map.Entry<TopicPartition, Seq<Object>> entry = it.next();
                 if (partitionIdList.contains(entry.getKey().partition())) {
                     continue;
                 }
@@ -75,15 +68,16 @@ public class TopicReassignUtils {
                 it.remove();
             }
         }
-        return ZkUtils.formatAsReassignmentJson(JavaConverters.mapAsScalaMapConverter(reassignMap).asScala());
+
+        return ReassignPartitionsCommand.formatAsReassignmentJson(JavaConverters.mapAsScalaMapConverter(reassignMap).asScala(), Map$.MODULE$.empty());
     }
 
-    private static Map<TopicAndPartition, Seq<Object>> createReassignmentMap(ZkUtils zkUtils,
-                                                                             String topicName,
-                                                                             List<Object> brokerIdList) {
-        scala.collection.Map<TopicAndPartition, Seq<Object>> scalaReassignmentMap =
+    private static Map<TopicPartition, Seq<Object>> createReassignmentMap(KafkaZkClient zkClient,
+                                                                          String topicName,
+                                                                          List<Object> brokerIdList) {
+        scala.collection.Map<TopicPartition, Seq<Object>> scalaReassignmentMap =
                 ReassignPartitionsCommand.generateAssignment(
-                        zkUtils,
+                        zkClient,
                         JavaConverters.asScalaIteratorConverter(brokerIdList.iterator()).asScala().toSeq(),
                         JSON.toJSONString(generateTopicMoveProperties(topicName)),
                         false)

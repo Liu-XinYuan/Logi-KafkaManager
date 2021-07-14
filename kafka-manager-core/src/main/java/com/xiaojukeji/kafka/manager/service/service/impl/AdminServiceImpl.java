@@ -14,6 +14,7 @@ import com.xiaojukeji.kafka.manager.common.zookeeper.znode.brokers.BrokerMetadat
 import com.xiaojukeji.kafka.manager.common.entity.pojo.ClusterDO;
 import com.xiaojukeji.kafka.manager.common.entity.pojo.TopicDO;
 import com.xiaojukeji.kafka.manager.common.zookeeper.znode.brokers.TopicMetadata;
+import com.xiaojukeji.kafka.manager.service.cache.KafkaClientPool;
 import com.xiaojukeji.kafka.manager.service.cache.PhysicalClusterMetadataManager;
 import com.xiaojukeji.kafka.manager.service.service.*;
 import com.xiaojukeji.kafka.manager.service.service.gateway.AuthorityService;
@@ -21,7 +22,8 @@ import com.xiaojukeji.kafka.manager.service.utils.KafkaZookeeperUtils;
 import com.xiaojukeji.kafka.manager.service.utils.TopicCommands;
 import kafka.admin.AdminOperationException;
 import kafka.admin.PreferredReplicaLeaderElectionCommand;
-import kafka.utils.ZkUtils;
+import kafka.zk.KafkaZkClient;
+import kafka.zk.PreferredReplicaElectionZNode;
 import org.apache.kafka.common.security.JaasUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -148,46 +150,29 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public TaskStatusEnum preferredReplicaElectionStatus(ClusterDO clusterDO) {
-        ZkUtils zkUtils = null;
         try {
-            zkUtils = ZkUtils.apply(clusterDO.getZookeeper(),
-                    Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS,
-                    Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS,
-                    JaasUtils.isZkSecurityEnabled()
-            );
-            if (zkUtils.pathExists(ZkUtils.PreferredReplicaLeaderElectionPath())) {
+            KafkaZkClient kafkaZkClient = KafkaClientPool.getKafkaZkClient(clusterDO.getId());
+            if (kafkaZkClient.pathExists(PreferredReplicaElectionZNode.path())) {
                 return TaskStatusEnum.RUNNING;
             }
         } catch (Exception e) {
             return TaskStatusEnum.UNKNOWN;
-        } finally {
-            if (null != zkUtils) {
-                zkUtils.close();
-            }
         }
         return TaskStatusEnum.SUCCEED;
     }
 
     @Override
     public ResultStatus preferredReplicaElection(ClusterDO clusterDO, String operator) {
-        ZkUtils zkUtils = null;
+
         try {
-            zkUtils = ZkUtils.apply(clusterDO.getZookeeper(),
-                    Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS,
-                    Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS,
-                    JaasUtils.isZkSecurityEnabled()
-            );
+            KafkaZkClient kafkaZkClient = KafkaClientPool.getKafkaZkClient(clusterDO.getId());
             PreferredReplicaLeaderElectionCommand command =
-                    new PreferredReplicaLeaderElectionCommand(zkUtils, zkUtils.getAllPartitions());
+                    new PreferredReplicaLeaderElectionCommand(kafkaZkClient, kafkaZkClient.getAllPartitions());
             command.moveLeaderToPreferredReplica();
         } catch (AdminOperationException e) {
 
         } catch (Throwable t) {
 
-        } finally {
-            if (null != zkUtils) {
-                zkUtils.close();
-            }
         }
         return ResultStatus.SUCCESS;
     }
@@ -242,18 +227,14 @@ public class AdminServiceImpl implements AdminService {
             return ResultStatus.SUCCESS;
         }
 
-        ZkUtils zkUtils = null;
         try {
             String preferredReplicaElectString = convert2preferredReplicaElectString(partitionMap);
 
-            zkUtils = ZkUtils.apply(clusterDO.getZookeeper(),
-                    Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS,
-                    Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS,
-                    JaasUtils.isZkSecurityEnabled()
-            );
+            KafkaZkClient kafkaZkClient = KafkaClientPool.getKafkaZkClient(clusterDO.getId());
+
             PreferredReplicaLeaderElectionCommand preferredReplicaElectionCommand =
                     new PreferredReplicaLeaderElectionCommand(
-                            zkUtils,
+                            kafkaZkClient,
                             PreferredReplicaLeaderElectionCommand.parsePreferredReplicaElectionData(
                                     preferredReplicaElectString
                             )
@@ -261,10 +242,6 @@ public class AdminServiceImpl implements AdminService {
             preferredReplicaElectionCommand.moveLeaderToPreferredReplica();
         } catch (Exception e) {
             return ResultStatus.OPERATION_FAILED;
-        } finally {
-            if (zkUtils != null) {
-                zkUtils.close();
-            }
         }
         return ResultStatus.SUCCESS;
     }

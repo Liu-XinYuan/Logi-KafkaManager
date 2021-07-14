@@ -16,6 +16,7 @@ import com.xiaojukeji.kafka.manager.service.service.TopicService;
 import com.xiaojukeji.kafka.manager.task.component.AbstractScheduledTask;
 import com.xiaojukeji.kafka.manager.task.component.CustomScheduled;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.InterruptException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
 /**
@@ -155,7 +157,14 @@ public class CollectAndPublishCGData extends AbstractScheduledTask<ClusterDO> {
                                                     long startTimeUnitMs) {
 
         Map<Integer, Long> consumerOffsetMap =
-                consumerService.getConsumerOffset(clusterDO, topicName, consumerGroup);
+                null;
+        try {
+            consumerOffsetMap = consumerService.getConsumerOffset(clusterDO, topicName, consumerGroup);
+        } catch (ExecutionException e) {
+            LOGGER.error("fetch consumer offset execute failed", e);
+        } catch (InterruptedException e) {
+            throw new InterruptException("fetch consumer offset thread interruptted", e);
+        }
         if (ValidateUtils.isEmptyMap(consumerOffsetMap)) {
             return null;
         }

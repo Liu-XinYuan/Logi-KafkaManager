@@ -20,18 +20,21 @@ import com.xiaojukeji.kafka.manager.service.cache.KafkaClientPool;
 import com.xiaojukeji.kafka.manager.service.service.ConsumerService;
 import com.xiaojukeji.kafka.manager.service.service.TopicService;
 import com.xiaojukeji.kafka.manager.common.zookeeper.ZkPathUtil;
-import kafka.admin.AdminClient;
 import org.apache.commons.lang.StringUtils;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.ConsumerGroupDescription;
+import org.apache.kafka.clients.admin.MemberDescription;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.protocol.types.SchemaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import scala.collection.JavaConversions;
 
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 /**
@@ -123,25 +126,23 @@ public class ConsumerServiceImpl implements ConsumerService {
         try {
             AdminClient adminClient = KafkaClientPool.getAdminClient(clusterId);
 
-            AdminClient.ConsumerGroupSummary consumerGroupSummary = adminClient.describeConsumerGroup(consumerGroup);
+            ConsumerGroupDescription consumerGroupSummary = adminClient.describeConsumerGroups(Collections.singleton(consumerGroup)).all().get().get(consumerGroup);
             if (ValidateUtils.isNull(consumerGroupSummary)) {
                 return summary;
             }
-            summary.setState(consumerGroupSummary.state());
+            summary.setState(consumerGroupSummary.state().name());
 
-            Iterator<scala.collection.immutable.List<AdminClient.ConsumerSummary>> it = JavaConversions.asJavaIterator(consumerGroupSummary.consumers().iterator());
+            Iterator<MemberDescription> it = consumerGroupSummary.members().iterator();
             while (it.hasNext()) {
-                List<AdminClient.ConsumerSummary> consumerSummaryList = JavaConversions.asJavaList(it.next());
-                for (AdminClient.ConsumerSummary consumerSummary: consumerSummaryList) {
-                    List<TopicPartition> topicPartitionList = JavaConversions.asJavaList(consumerSummary.assignment());
-                    if (ValidateUtils.isEmptyList(topicPartitionList)) {
+                    MemberDescription consumerSummary = it.next();
+                    Set<TopicPartition> topicPartitionList = consumerSummary.assignment().topicPartitions();
+                    if (ValidateUtils.isEmptySet(topicPartitionList)) {
                         continue;
                     }
                     if (topicPartitionList.stream().anyMatch(elem -> elem.topic().equals(topicName)) && consumerSummary.clientId().contains(".")) {
                         String [] splitArray = consumerSummary.clientId().split("\\.");
                         summary.getAppIdList().add(splitArray[0]);
                     }
-                }
             }
         } catch (SchemaException e) {
             logger.error("class=ConsumerServiceImpl||method=getConsumerGroupSummary||clusterId={}||topicName={}||consumerGroup={}||errMsg={}||schema exception",
@@ -155,7 +156,7 @@ public class ConsumerServiceImpl implements ConsumerService {
     }
 
     @Override
-    public List<ConsumeDetailDTO> getConsumeDetail(ClusterDO clusterDO, String topicName, ConsumerGroup consumerGroup) {
+    public List<ConsumeDetailDTO> getConsumeDetail(ClusterDO clusterDO, String topicName, ConsumerGroup consumerGroup) throws ExecutionException, InterruptedException {
         TopicMetadata topicMetadata = PhysicalClusterMetadataManager.getTopicMetadata(clusterDO.getId(), topicName);
         if (topicMetadata == null) {
             logger.warn("class=ConsumerServiceImpl||method=getConsumeDetail||clusterId={}||topicName={}||msg=topicMetadata is null!",
@@ -185,7 +186,7 @@ public class ConsumerServiceImpl implements ConsumerService {
     }
 
     @Override
-    public List<ConsumeSummaryDTO> getConsumeDetail(ClusterDO clusterDO) {
+    public List<ConsumeSummaryDTO> getConsumeDetail(ClusterDO clusterDO) throws ExecutionException, InterruptedException {
         List<ConsumeSummaryDTO> consumeDetailDTOList = getConsumerPartitionStateInBroker(clusterDO);
 
         if (consumeDetailDTOList == null) {
@@ -312,7 +313,7 @@ public class ConsumerServiceImpl implements ConsumerService {
     @Override
     public Map<Integer, Long> getConsumerOffset(ClusterDO clusterDO,
                                                 String topicName,
-                                                ConsumerGroup consumerGroup) {
+                                                ConsumerGroup consumerGroup) throws ExecutionException, InterruptedException {
         if (ValidateUtils.isNull(clusterDO) || ValidateUtils.isBlank(topicName) || ValidateUtils.isNull(consumerGroup)) {
             return null;
         }
@@ -347,7 +348,7 @@ public class ConsumerServiceImpl implements ConsumerService {
 
     private Map<Integer, Long> getConsumerOffsetFromBK(ClusterDO clusterDO,
                                                        String topicName,
-                                                       String consumerGroup) {
+                                                       String consumerGroup) throws ExecutionException, InterruptedException {
         Map<Integer, String> stringOffsetMap =
                 getOffsetByGroupAndTopicFromBroker(clusterDO, consumerGroup, topicName);
         if (ValidateUtils.isNull(stringOffsetMap)) {
@@ -367,26 +368,23 @@ public class ConsumerServiceImpl implements ConsumerService {
     }
 
     private Map<Integer, String> getConsumeIdMap(Long clusterId, String topicName, String consumerGroup) {
-        AdminClient.ConsumerGroupSummary consumerGroupSummary = ConsumerMetadataCache.getConsumerGroupSummary(clusterId, consumerGroup);
+        ConsumerGroupDescription consumerGroupSummary = ConsumerMetadataCache.getConsumerGroupSummary(clusterId, consumerGroup);
         if (consumerGroupSummary == null) {
             return new HashMap<>(0);
         }
         Map<Integer, String> consumerIdMap = new HashMap<>();
-        for (scala.collection.immutable.List<AdminClient.ConsumerSummary> scalaSubConsumerSummaryList: JavaConversions.asJavaList(consumerGroupSummary.consumers().toList())) {
-            List<AdminClient.ConsumerSummary> subConsumerSummaryList = JavaConversions.asJavaList(scalaSubConsumerSummaryList);
-            for (AdminClient.ConsumerSummary consumerSummary: subConsumerSummaryList) {
-                for (TopicPartition tp: JavaConversions.asJavaList(consumerSummary.assignment())) {
+        for (MemberDescription memberDescription: consumerGroupSummary.members()) {
+                for (TopicPartition tp: memberDescription.assignment().topicPartitions()) {
                     if (!tp.topic().equals(topicName)) {
                         continue;
                     }
-                    consumerIdMap.put(tp.partition(), consumerSummary.host().substring(1, consumerSummary.host().length()) + ":" + consumerSummary.consumerId());
+                    consumerIdMap.put(tp.partition(), memberDescription.host().substring(1, memberDescription.host().length()) + ":" + memberDescription.consumerId());
                 }
             }
-        }
         return consumerIdMap;
     }
 
-    private List<ConsumeDetailDTO> getConsumerPartitionStateInBroker(ClusterDO clusterDO, TopicMetadata topicMetadata, ConsumerGroup consumerGroup) {
+    private List<ConsumeDetailDTO> getConsumerPartitionStateInBroker(ClusterDO clusterDO, TopicMetadata topicMetadata, ConsumerGroup consumerGroup) throws ExecutionException, InterruptedException {
         Map<Integer, String> consumerIdMap = getConsumeIdMap(clusterDO.getId(), topicMetadata.getTopic(), consumerGroup.getConsumerGroup());
         Map<Integer, String> consumeOffsetMap = getOffsetByGroupAndTopicFromBroker(clusterDO, consumerGroup.getConsumerGroup(), topicMetadata.getTopic());
 
@@ -406,7 +404,7 @@ public class ConsumerServiceImpl implements ConsumerService {
         return consumeDetailDTOList;
     }
 
-    private List<ConsumeSummaryDTO> getConsumerPartitionStateInBroker(ClusterDO clusterDO) {
+    private List<ConsumeSummaryDTO> getConsumerPartitionStateInBroker(ClusterDO clusterDO) throws ExecutionException, InterruptedException {
         Set<String> groups = ConsumerMetadataCache.getGroupInBrokerMap(clusterDO.getId());
         Map<String, Map<String, Long>> offsetByGroupAndTopicFromBroker = getOffsetByGroupAndTopicFromBroker(clusterDO, groups);
 
@@ -467,17 +465,17 @@ public class ConsumerServiceImpl implements ConsumerService {
      */
     private Map<Integer, String> getOffsetByGroupAndTopicFromBroker(ClusterDO clusterDO,
                                                                     String consumerGroup,
-                                                                    String topicName) {
+                                                                    String topicName) throws ExecutionException, InterruptedException {
         Map<Integer, String> result = new HashMap<>();
         AdminClient client = KafkaClientPool.getAdminClient(clusterDO.getId());
         if (null == client) {
             return result;
         }
-        Map<TopicPartition, Object> offsetMap = JavaConversions.asJavaMap(client.listGroupOffsets(consumerGroup));
-        for (Map.Entry<TopicPartition, Object> entry : offsetMap.entrySet()) {
+        Map<TopicPartition, OffsetAndMetadata> offsetMap = client.listConsumerGroupOffsets(consumerGroup).partitionsToOffsetAndMetadata().get();
+        for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : offsetMap.entrySet()) {
             TopicPartition topicPartition = entry.getKey();
             if (topicPartition.topic().equals(topicName)) {
-                result.put(topicPartition.partition(), entry.getValue().toString());
+                result.put(topicPartition.partition(), entry.getValue().offset() + "");
             }
         }
         return result;
@@ -488,7 +486,7 @@ public class ConsumerServiceImpl implements ConsumerService {
      * groupId -> (topic->lag)
      */
     private Map<String, Map<String, Long>> getOffsetByGroupAndTopicFromBroker(ClusterDO clusterDO,
-                                                                              Set<String> consumerGroups) {
+                                                                              Set<String> consumerGroups) throws ExecutionException, InterruptedException {
         Map<String, Map<String, Long>> result = new HashMap<>();
         AdminClient client = KafkaClientPool.getAdminClient(clusterDO.getId());
         if (null == client) {
@@ -496,17 +494,17 @@ public class ConsumerServiceImpl implements ConsumerService {
         }
 
         for (String consumerGroup : consumerGroups) {
-            Map<TopicPartition, Object> offsetMap = JavaConversions.asJavaMap(client.listGroupOffsets(consumerGroup));
-            for (Map.Entry<TopicPartition, Object> entry : offsetMap.entrySet()) {
+            Map<TopicPartition, OffsetAndMetadata> offsetMap = client.listConsumerGroupOffsets(consumerGroup).partitionsToOffsetAndMetadata().get();
+            for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : offsetMap.entrySet()) {
                 TopicPartition topicPartition = entry.getKey();
                 if (result.get(consumerGroup) == null) {
                     result.put(consumerGroup, new HashMap<String, Long>());
                 }
                 Map<String, Long> map = result.get(consumerGroup);
                 if (map.get(topicPartition.topic()) == null) {
-                    map.put(topicPartition.topic(), (Long) entry.getValue());
+                    map.put(topicPartition.topic(), (Long) entry.getValue().offset());
                 } else {
-                    map.put(topicPartition.topic(), (Long) entry.getValue() + map.get(topicPartition.topic()));
+                    map.put(topicPartition.topic(), (Long) entry.getValue().offset() + map.get(topicPartition.topic()));
                 }
             }
         }

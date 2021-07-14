@@ -59,13 +59,13 @@ public class ValidateUtils {
     /**
      * 是空字符串
      */
-    public static boolean equalList(List<Object> seq1, List<Object> seq2) {
+    public static <T,K> boolean equalList(List<T> seq1, List<K> seq2) {
         if (isNull(seq1) && isNull(seq2)) {
             return true;
         } else if (isNull(seq1) || isNull(seq2) || seq1.size() != seq2.size()) {
             return false;
         }
-        for (Object elem: seq1) {
+        for (T elem: seq1) {
             if (!seq2.contains(elem)) {
                 return false;
             }

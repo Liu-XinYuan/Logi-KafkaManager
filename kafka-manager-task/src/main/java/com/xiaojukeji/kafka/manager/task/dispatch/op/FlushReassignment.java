@@ -11,6 +11,7 @@ import com.xiaojukeji.kafka.manager.common.zookeeper.ZkPathUtil;
 import com.xiaojukeji.kafka.manager.dao.ReassignTaskDao;
 import com.xiaojukeji.kafka.manager.common.entity.pojo.ClusterDO;
 import com.xiaojukeji.kafka.manager.common.entity.pojo.ReassignTaskDO;
+import com.xiaojukeji.kafka.manager.service.cache.KafkaClientPool;
 import com.xiaojukeji.kafka.manager.service.service.AdminService;
 import com.xiaojukeji.kafka.manager.service.service.ClusterService;
 import com.xiaojukeji.kafka.manager.service.service.ReassignService;
@@ -18,13 +19,16 @@ import com.xiaojukeji.kafka.manager.task.component.AbstractScheduledTask;
 import com.xiaojukeji.kafka.manager.task.component.CustomScheduled;
 import com.xiaojukeji.kafka.manager.task.component.EmptyEntry;
 import kafka.admin.ReassignPartitionsCommand;
-import kafka.common.TopicAndPartition;
-import kafka.utils.ZkUtils;
-import org.apache.kafka.common.security.JaasUtils;
+import kafka.zk.KafkaZkClient;
+import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
+import scala.Option;
 
 import java.util.*;
 
@@ -114,40 +118,39 @@ public class FlushReassignment extends AbstractScheduledTask<EmptyEntry> {
                 continue;
             }
 
-            ZkUtils zkUtils = null;
+
             try {
                 ClusterDO clusterDO = clusterService.getById(elem.getClusterId());
                 if (ValidateUtils.isNull(clusterDO)) {
                     continue;
                 }
 
-                zkUtils = ZkUtils.apply(clusterDO.getZookeeper(),
-                        Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS,
-                        Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS,
-                        JaasUtils.isZkSecurityEnabled());
-
-                Map<TopicAndPartition, TaskStatusReassignEnum> statusMap =
-                        reassignService.verifyAssignment(zkUtils, elem.getReassignmentJson());
+                KafkaZkClient kafkaZkClient = KafkaClientPool.getKafkaZkClient(clusterDO.getId());
+                AdminClient adminClient = KafkaClientPool.getAdminClient(clusterDO.getId());
+                Map<TopicPartition, TaskStatusReassignEnum> statusMap =
+                        reassignService.verifyAssignment(clusterDO.getId(), elem.getReassignmentJson());
                 if (ValidateUtils.isNull(statusMap)) {
                     return;
                 }
 
                 Set<TaskStatusReassignEnum> statusSet = new HashSet<>();
-                for (Map.Entry<TopicAndPartition, TaskStatusReassignEnum> entry: statusMap.entrySet()) {
+                for (Map.Entry<TopicPartition, TaskStatusReassignEnum> entry: statusMap.entrySet()) {
                     statusSet.add(entry.getValue());
                 }
                 if (statusSet.contains(TaskStatusReassignEnum.RUNNING)) {
                     // 迁移任务未完成, 则执行限流, 并结束调用
                     ReassignPartitionsCommand.executeAssignment(
-                            zkUtils,
+                            kafkaZkClient,
+                            Option.apply((Admin)adminClient),
                             elem.getReassignmentJson(),
-                            elem.getRealThrottle()
+                            new ReassignPartitionsCommand.Throttle(-1L,-1L, null),
+                            10000
                     );
                     return;
                 }
 
                 // 迁移任务已经完成
-                ReassignPartitionsCommand.verifyAssignment(zkUtils, elem.getReassignmentJson());
+                ReassignPartitionsCommand.verifyAssignment(kafkaZkClient,Option.apply((Admin)adminClient), elem.getReassignmentJson());
 
                 Thread.sleep(10000);
 
@@ -165,11 +168,6 @@ public class FlushReassignment extends AbstractScheduledTask<EmptyEntry> {
                 }
             } catch (Exception e) {
                 LOGGER.error("modify running failed, task:{}.", elem, e);
-            } finally {
-                if (zkUtils != null) {
-                    zkUtils.close();
-                }
-                zkUtils = null;
             }
         }
     }
@@ -179,7 +177,8 @@ public class FlushReassignment extends AbstractScheduledTask<EmptyEntry> {
             return false;
         }
 
-        ZkUtils zkUtils = null;
+        KafkaZkClient zkClient = null;
+        AdminClient adminClient = null;
         for (ReassignTaskDO elem : subDOList) {
             if (!TaskStatusReassignEnum.RUNNABLE.getCode().equals(elem.getStatus())) {
                 continue;
@@ -194,11 +193,11 @@ public class FlushReassignment extends AbstractScheduledTask<EmptyEntry> {
             }
 
             try {
-                zkUtils = ZkUtils.apply(clusterDO.getZookeeper(),
-                        Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS,
-                        Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS,
-                        JaasUtils.isZkSecurityEnabled());
-                if (zkUtils.pathExists(ZkPathUtil.REASSIGN_PARTITIONS_ROOT_NODE)) {
+                zkClient = KafkaClientPool.getKafkaZkClient(clusterDO.getId());
+                adminClient = KafkaClientPool.getAdminClient(clusterDO.getId());
+
+
+                if (zkClient.pathExists(ZkPathUtil.REASSIGN_PARTITIONS_ROOT_NODE)) {
                     // 任务已经存在, 不知道是谁弄的, 因为未知, 就将其当作是本次触发的
                     return true;
                 }
@@ -208,18 +207,15 @@ public class FlushReassignment extends AbstractScheduledTask<EmptyEntry> {
 
                 // 启动Topic迁移
                 ReassignPartitionsCommand.executeAssignment(
-                        zkUtils,
+                        zkClient,
+                        Option.apply((Admin)adminClient),
                         elem.getReassignmentJson(),
-                        elem.getRealThrottle()
+                        new ReassignPartitionsCommand.Throttle(-1L, -1L, null),
+                        10000
                 );
             } catch (Throwable t) {
                 LOGGER.error("execute assignment failed, task:{}.", elem, t);
                 return false;
-            } finally {
-                if (zkUtils != null) {
-                    zkUtils.close();
-                }
-                zkUtils = null;
             }
 
             try {

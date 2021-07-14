@@ -7,7 +7,8 @@ import com.xiaojukeji.kafka.manager.common.entity.pojo.ClusterDO;
 import com.xiaojukeji.kafka.manager.service.cache.ConsumerMetadataCache;
 import com.xiaojukeji.kafka.manager.service.cache.KafkaClientPool;
 import com.xiaojukeji.kafka.manager.service.service.ClusterService;
-import kafka.admin.AdminClient;
+import org.apache.kafka.clients.admin.*;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.protocol.types.SchemaException;
 import org.slf4j.Logger;
@@ -54,7 +55,7 @@ public class FlushBKConsumerGroupMetadata {
 
         // 获取消费组summary信息
         Map<String, Set<String>> topicNameConsumerGroupMap = new HashMap<>();
-        Map<String, AdminClient.ConsumerGroupSummary> consumerGroupSummary =
+        Map<String, ConsumerGroupDescription> consumerGroupSummary =
                 collectConsumerGroupSummary(clusterId, consumerGroupSet, topicNameConsumerGroupMap);
 
         // 获取Topic下的消费组
@@ -74,25 +75,22 @@ public class FlushBKConsumerGroupMetadata {
     private void collectAndSaveConsumerGroup(Long clusterId, Set<String> consumerGroupSet) {
         try {
             AdminClient adminClient = KafkaClientPool.getAdminClient(clusterId);
-
-            scala.collection.immutable.Map<org.apache.kafka.common.Node, scala.collection.immutable.List<kafka.coordinator.GroupOverview>> brokerGroupMap = adminClient.listAllGroups();
-            for (scala.collection.immutable.List<kafka.coordinator.GroupOverview> brokerGroup : JavaConversions.asJavaMap(brokerGroupMap).values()) {
-                List<kafka.coordinator.GroupOverview> lists = JavaConversions.asJavaList(brokerGroup);
-                for (kafka.coordinator.GroupOverview groupOverview : lists) {
-                    String consumerGroup = groupOverview.groupId();
-                    if (consumerGroup != null && consumerGroup.contains("#")) {
-                        String[] splitArray = consumerGroup.split("#");
-                        consumerGroup = splitArray[splitArray.length - 1];
-                    }
-                    consumerGroupSet.add(consumerGroup);
+            Collection<ConsumerGroupListing> consumerGroupListings = adminClient.listConsumerGroups().all().get();
+            for (ConsumerGroupListing consumerGroupListing : consumerGroupListings) {
+                String consumerGroup = consumerGroupListing.groupId();
+                if (consumerGroup != null && consumerGroup.contains("#")) {
+                    String[] splitArray = consumerGroup.split("#");
+                    consumerGroup = splitArray[splitArray.length - 1];
                 }
+                consumerGroupSet.add(consumerGroup);
             }
+
         } catch (Exception e) {
             LOGGER.error("collect consumerGroup failed, clusterId:{}.", clusterId, e);
         }
     }
 
-    private Map<String, AdminClient.ConsumerGroupSummary> collectConsumerGroupSummary(Long clusterId,
+    private Map<String, ConsumerGroupDescription> collectConsumerGroupSummary(Long clusterId,
                                                                                       Set<String> consumerGroupSet,
                                                                                       Map<String, Set<String>> topicNameConsumerGroupMap) {
         if (consumerGroupSet == null || consumerGroupSet.isEmpty()) {
@@ -100,31 +98,31 @@ public class FlushBKConsumerGroupMetadata {
         }
         AdminClient adminClient = KafkaClientPool.getAdminClient(clusterId);
 
-        Map<String, AdminClient.ConsumerGroupSummary> consumerGroupSummaryMap = new HashMap<>();
+        Map<String, ConsumerGroupDescription> consumerGroupSummaryMap = new HashMap<>();
         for (String consumerGroup : consumerGroupSet) {
             try {
-                AdminClient.ConsumerGroupSummary consumerGroupSummary = adminClient.describeConsumerGroup(consumerGroup);
-                if (consumerGroupSummary == null) {
+                Map<String, ConsumerGroupDescription> stringConsumerGroupDescriptionMap = adminClient.describeConsumerGroups(Collections.singleton(consumerGroup)).all().get();
+                ConsumerGroupDescription consumerGroupDescription = stringConsumerGroupDescriptionMap.get(consumerGroup);
+                if (consumerGroupDescription == null) {
                     continue;
                 }
-                consumerGroupSummaryMap.put(consumerGroup, consumerGroupSummary);
+                consumerGroupSummaryMap.put(consumerGroup, consumerGroupDescription);
 
-                java.util.Iterator<scala.collection.immutable.List<AdminClient.ConsumerSummary>> it =
-                        JavaConversions.asJavaIterator(consumerGroupSummary.consumers().iterator());
+                java.util.Iterator<MemberDescription> it =
+                        consumerGroupDescription.members().iterator();
                 while (it.hasNext()) {
-                    List<AdminClient.ConsumerSummary> consumerSummaryList = JavaConversions.asJavaList(it.next());
-                    for (AdminClient.ConsumerSummary consumerSummary: consumerSummaryList) {
-                        List<TopicPartition> topicPartitionList = JavaConversions.asJavaList(consumerSummary.assignment());
-                        if (topicPartitionList == null) {
-                            continue;
-                        }
-                        for (TopicPartition topicPartition: topicPartitionList) {
-                            Set<String> groupSet = topicNameConsumerGroupMap.getOrDefault(topicPartition.topic(), new HashSet<>());
-                            groupSet.add(consumerGroup);
-                            topicNameConsumerGroupMap.put(topicPartition.topic(), groupSet);
-                        }
+                    MemberDescription next = it.next();
+                    Set<TopicPartition> topicPartitionSet = next.assignment().topicPartitions();
+                    if (topicPartitionSet == null) {
+                        continue;
+                    }
+                    for (TopicPartition topicPartition : topicPartitionSet) {
+                        Set<String> groupSet = topicNameConsumerGroupMap.getOrDefault(topicPartition.topic(), new HashSet<>());
+                        groupSet.add(consumerGroup);
+                        topicNameConsumerGroupMap.put(topicPartition.topic(), groupSet);
                     }
                 }
+
             } catch (SchemaException e) {
                 LOGGER.error("schemaException exception, clusterId:{} consumerGroup:{}.", clusterId, consumerGroup, e);
             } catch (Exception e) {
@@ -144,8 +142,8 @@ public class FlushBKConsumerGroupMetadata {
 
         for (String consumerGroup: consumerGroupSet) {
             try {
-                Map<TopicPartition, Object> topicPartitionAndOffsetMap = JavaConversions.asJavaMap(adminClient.listGroupOffsets(consumerGroup));
-                for (Map.Entry<TopicPartition, Object> entry : topicPartitionAndOffsetMap.entrySet()) {
+                Map<TopicPartition, OffsetAndMetadata> topicPartitionAndOffsetMap = adminClient.listConsumerGroupOffsets(consumerGroup).partitionsToOffsetAndMetadata().get();
+                for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : topicPartitionAndOffsetMap.entrySet()) {
                     TopicPartition tp = entry.getKey();
                     Set<String> subConsumerGroupSet = topicNameConsumerGroupMap.getOrDefault(tp.topic(), new HashSet<>());
                     subConsumerGroupSet.add(consumerGroup);

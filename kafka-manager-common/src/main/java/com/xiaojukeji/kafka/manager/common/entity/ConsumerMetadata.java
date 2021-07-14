@@ -1,6 +1,6 @@
 package com.xiaojukeji.kafka.manager.common.entity;
 
-import kafka.admin.AdminClient;
+import org.apache.kafka.clients.admin.ConsumerGroupDescription;
 
 import java.util.*;
 
@@ -13,11 +13,11 @@ public class ConsumerMetadata {
 
     private Map<String, Set<String>> topicNameConsumerGroupMap = new HashMap<>();
 
-    private Map<String, AdminClient.ConsumerGroupSummary> consumerGroupSummaryMap = new HashMap<>();
+    private Map<String, ConsumerGroupDescription> consumerGroupSummaryMap = new HashMap<>();
 
     public ConsumerMetadata(Set<String> consumerGroupSet,
                             Map<String, Set<String>> topicNameConsumerGroupMap,
-                            Map<String, AdminClient.ConsumerGroupSummary> consumerGroupSummaryMap) {
+                            Map<String, ConsumerGroupDescription> consumerGroupSummaryMap) {
         this.consumerGroupSet = consumerGroupSet;
         this.topicNameConsumerGroupMap = topicNameConsumerGroupMap;
         this.consumerGroupSummaryMap = consumerGroupSummaryMap;
@@ -31,7 +31,7 @@ public class ConsumerMetadata {
         return topicNameConsumerGroupMap;
     }
 
-    public Map<String, AdminClient.ConsumerGroupSummary> getConsumerGroupSummaryMap() {
+    public Map<String, ConsumerGroupDescription> getConsumerGroupSummaryMap() {
         return consumerGroupSummaryMap;
     }
 }

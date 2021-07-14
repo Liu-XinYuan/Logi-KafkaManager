@@ -13,15 +13,16 @@ import com.xiaojukeji.kafka.manager.openapi.common.dto.*;
 import com.xiaojukeji.kafka.manager.service.cache.KafkaClientPool;
 import com.xiaojukeji.kafka.manager.service.cache.PhysicalClusterMetadataManager;
 import com.xiaojukeji.kafka.manager.service.service.*;
-import kafka.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsResult;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import scala.collection.JavaConversions;
 
 import java.util.*;
 
@@ -57,7 +58,7 @@ public class ThirdPartServiceImpl implements ThirdPartService {
         }
 
         // 获取消费组当前的offset
-        Map<TopicPartition, Object> consumeOffsetMap = listGroupOffsets(clusterId, consumerGroup);
+        Map<TopicPartition, OffsetAndMetadata> consumeOffsetMap = listGroupOffsets(clusterId, consumerGroup);
         if (ValidateUtils.isNull(consumeOffsetMap)) {
             return new Result<>(ConsumeHealthEnum.UNKNOWN);
         }
@@ -76,7 +77,8 @@ public class ThirdPartServiceImpl implements ThirdPartService {
 
         for (TopicPartition tp : offsetAndTimeMap.keySet()) {
             OffsetAndTimestamp offsetAndTimestamp = offsetAndTimeMap.get(tp);
-            Long consumeOffset = (Long) consumeOffsetMap.get(tp);
+            OffsetAndMetadata offsetAndMetadata = consumeOffsetMap.get(tp);
+            Long consumeOffset = offsetAndMetadata == null ? null : (Long) offsetAndMetadata.offset();
             if (ValidateUtils.isNull(consumeOffset)) {
                 return new Result<>(ConsumeHealthEnum.UNKNOWN);
             }
@@ -91,13 +93,15 @@ public class ThirdPartServiceImpl implements ThirdPartService {
         return new Result<>(ConsumeHealthEnum.HEALTH);
     }
 
-    private Map<TopicPartition, Object> listGroupOffsets(Long clusterId, String consumerGroup) {
+    private Map<TopicPartition, OffsetAndMetadata> listGroupOffsets(Long clusterId, String consumerGroup) {
         AdminClient client = KafkaClientPool.getAdminClient(clusterId);
         if (ValidateUtils.isNull(client)) {
             return null;
         }
         try {
-            return JavaConversions.asJavaMap(client.listGroupOffsets(consumerGroup));
+            ListConsumerGroupOffsetsResult listConsumerGroupOffsetsResult = client.listConsumerGroupOffsets(consumerGroup);
+            Map<TopicPartition, OffsetAndMetadata> topicPartitionOffsetAndMetadataMap = listConsumerGroupOffsetsResult.partitionsToOffsetAndMetadata().get();
+            return topicPartitionOffsetAndMetadataMap;
         } catch (Exception e) {
             LOGGER.error("list group offsets failed, clusterId:{}, consumerGroup:{}.", clusterId, consumerGroup, e);
         }

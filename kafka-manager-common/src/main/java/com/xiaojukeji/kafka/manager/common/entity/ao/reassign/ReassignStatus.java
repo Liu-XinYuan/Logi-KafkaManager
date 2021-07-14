@@ -2,7 +2,7 @@ package com.xiaojukeji.kafka.manager.common.entity.ao.reassign;
 
 import com.xiaojukeji.kafka.manager.common.bizenum.TaskStatusReassignEnum;
 import com.xiaojukeji.kafka.manager.common.zookeeper.znode.ReassignmentElemData;
-import kafka.common.TopicAndPartition;
+import org.apache.kafka.common.TopicPartition;
 
 import java.util.List;
 import java.util.Map;
@@ -30,7 +30,7 @@ public class ReassignStatus {
 
     private List<ReassignmentElemData> reassignList;
 
-    private Map<TopicAndPartition, TaskStatusReassignEnum> reassignStatusMap;
+    private Map<TopicPartition, TaskStatusReassignEnum> reassignStatusMap;
 
     public Long getSubTaskId() {
         return subTaskId;
@@ -104,11 +104,11 @@ public class ReassignStatus {
         this.reassignList = reassignList;
     }
 
-    public Map<TopicAndPartition, TaskStatusReassignEnum> getReassignStatusMap() {
+    public Map<TopicPartition, TaskStatusReassignEnum> getReassignStatusMap() {
         return reassignStatusMap;
     }
 
-    public void setReassignStatusMap(Map<TopicAndPartition, TaskStatusReassignEnum> reassignStatusMap) {
+    public void setReassignStatusMap(Map<TopicPartition, TaskStatusReassignEnum> reassignStatusMap) {
         this.reassignStatusMap = reassignStatusMap;
     }
 

@@ -11,6 +11,7 @@ import com.xiaojukeji.kafka.manager.common.entity.pojo.ClusterDO;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 /**
  * consumer相关的服务接口
@@ -36,19 +37,19 @@ public interface ConsumerService {
     /**
      * 查询消费详情
      */
-    List<ConsumeDetailDTO> getConsumeDetail(ClusterDO clusterDO, String topicName, ConsumerGroup consumerGroup);
+    List<ConsumeDetailDTO> getConsumeDetail(ClusterDO clusterDO, String topicName, ConsumerGroup consumerGroup) throws ExecutionException, InterruptedException;
 
     /**
      * 查询消费详情
      */
-    List<ConsumeSummaryDTO> getConsumeDetail(ClusterDO clusterDO);
+    List<ConsumeSummaryDTO> getConsumeDetail(ClusterDO clusterDO) throws ExecutionException, InterruptedException;
 
     /**
      * 获取消费组消费的Topic列表
      */
     List<String> getConsumerGroupConsumedTopicList(Long clusterId, String consumerGroup, String location);
 
-    Map<Integer, Long> getConsumerOffset(ClusterDO clusterDO, String topicName, ConsumerGroup consumerGroup);
+    Map<Integer, Long> getConsumerOffset(ClusterDO clusterDO, String topicName, ConsumerGroup consumerGroup) throws ExecutionException, InterruptedException;
 
     /**
      * 重置offset

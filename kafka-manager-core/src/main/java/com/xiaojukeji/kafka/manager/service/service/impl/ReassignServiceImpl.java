@@ -2,7 +2,6 @@ package com.xiaojukeji.kafka.manager.service.service.impl;
 
 import com.xiaojukeji.kafka.manager.common.bizenum.TaskStatusReassignEnum;
 import com.xiaojukeji.kafka.manager.common.bizenum.TopicReassignActionEnum;
-import com.xiaojukeji.kafka.manager.common.constant.Constant;
 import com.xiaojukeji.kafka.manager.common.entity.Result;
 import com.xiaojukeji.kafka.manager.common.entity.ResultStatus;
 import com.xiaojukeji.kafka.manager.common.entity.ao.reassign.ReassignStatus;
@@ -10,6 +9,7 @@ import com.xiaojukeji.kafka.manager.common.entity.dto.op.reassign.ReassignExecDT
 import com.xiaojukeji.kafka.manager.common.entity.dto.op.reassign.ReassignExecSubDTO;
 import com.xiaojukeji.kafka.manager.common.entity.dto.op.reassign.ReassignTopicDTO;
 import com.xiaojukeji.kafka.manager.common.utils.ValidateUtils;
+import com.xiaojukeji.kafka.manager.service.cache.KafkaClientPool;
 import com.xiaojukeji.kafka.manager.service.utils.KafkaZookeeperUtils;
 import com.xiaojukeji.kafka.manager.common.zookeeper.znode.brokers.TopicMetadata;
 import com.xiaojukeji.kafka.manager.dao.ReassignTaskDao;
@@ -21,19 +21,23 @@ import com.xiaojukeji.kafka.manager.service.service.ReassignService;
 import com.xiaojukeji.kafka.manager.service.service.RegionService;
 import com.xiaojukeji.kafka.manager.service.utils.MetricsConvertUtils;
 import com.xiaojukeji.kafka.manager.service.utils.TopicReassignUtils;
-import kafka.common.TopicAndPartition;
-import kafka.utils.ZkUtils;
-import org.I0Itec.zkclient.exception.ZkInterruptedException;
-import org.I0Itec.zkclient.exception.ZkTimeoutException;
-import org.apache.kafka.common.security.JaasUtils;
+import kafka.admin.ReassignPartitionsCommand;
+import kafka.zk.KafkaZkClient;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.PartitionReassignment;
+import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import scala.Tuple2;
 import scala.collection.JavaConversions;
+import scala.collection.JavaConverters;
 import scala.collection.Seq;
+import scala.collection.convert.Decorators;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Topic迁移
@@ -276,8 +280,8 @@ public class ReassignServiceImpl implements ReassignService {
                     statusList.add(reassignStatus);
                     continue;
                 }
-                Map<TopicAndPartition, TaskStatusReassignEnum> statusMap =
-                        verifyAssignment(clusterDO.getZookeeper(), elem.getReassignmentJson());
+                Map<TopicPartition, TaskStatusReassignEnum> statusMap =
+                        verifyAssignment(clusterDO.getId(), elem.getReassignmentJson());
                 reassignStatus.setReassignStatusMap(statusMap);
                 statusList.add(reassignStatus);
             } catch (Exception e) {
@@ -288,49 +292,47 @@ public class ReassignServiceImpl implements ReassignService {
     }
 
     @Override
-    public Map<TopicAndPartition, TaskStatusReassignEnum> verifyAssignment(String zkAddr, String reassignmentJson) {
-        ZkUtils zkUtils = null;
+    public Map<TopicPartition, TaskStatusReassignEnum> verifyAssignment(Long clusterId, String reassignmentJson) {
         try {
-            zkUtils = ZkUtils.apply(zkAddr,
-                    Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS,
-                    Constant.DEFAULT_SESSION_TIMEOUT_UNIT_MS,
-                    JaasUtils.isZkSecurityEnabled());
-            return verifyAssignment(zkUtils, reassignmentJson);
-        } catch (ZkInterruptedException | ZkTimeoutException | IllegalStateException e) {
-            LOGGER.error("connect zookeeper failed, zkAddr:{}.", zkAddr, e);
+            AdminClient adminClient = KafkaClientPool.getAdminClient(clusterId);
+            KafkaZkClient kafkaZkClient = KafkaClientPool.getKafkaZkClient(clusterId);
+            return verifyAssignment(adminClient,kafkaZkClient, reassignmentJson);
         } catch (Throwable t) {
             LOGGER.error("verify assignment failed, reassignmentJson:{}.", reassignmentJson, t);
-        } finally {
-            if (zkUtils != null) {
-                zkUtils.close();
-            }
         }
         return null;
     }
 
     @Override
-    public Map<TopicAndPartition, TaskStatusReassignEnum> verifyAssignment(ZkUtils zkUtils,
-                                                                            String reassignmentJson) {
+    public Map<TopicPartition, TaskStatusReassignEnum> verifyAssignment(AdminClient adminClient, KafkaZkClient zkClient,
+                                                                        String reassignmentJson) {
         // 本地迁移Json转Map
-        Map<TopicAndPartition, Seq<Object>> reassignMap =
-                JavaConversions.asJavaMap(ZkUtils.parsePartitionReassignmentData(reassignmentJson));
+        Map<TopicPartition, List<Integer>> reassignMap = new HashMap<>();
+        Decorators.AsJava<List<Tuple2<TopicPartition, Seq<Object>>>> listAsJava = JavaConverters.seqAsJavaListConverter(ReassignPartitionsCommand.parsePartitionReassignmentData(reassignmentJson)._1);
 
         // 从zk获取哪些分区正在迁移
-        Set<TopicAndPartition> beingReassignedMap =
-                JavaConversions.asJavaMap(zkUtils.getPartitionsBeingReassigned()).keySet();
+        Set<TopicPartition> topicPartitions = listAsJava.asJava().stream().map(x -> x._1).collect(Collectors.toSet());
 
         // 计算迁移结果
-        Map<TopicAndPartition, TaskStatusReassignEnum> reassignResult = new HashMap<>(reassignMap.size());
-        for (TopicAndPartition tp: reassignMap.keySet()) {
-            if (beingReassignedMap.contains(tp)) {
-                reassignResult.put(tp, TaskStatusReassignEnum.RUNNING);
-                continue;
+        Map<TopicPartition, TaskStatusReassignEnum> reassignResult = new HashMap<>(reassignMap.size());
+        try {
+            Map<TopicPartition, PartitionReassignment> topicPartitionReassignments = adminClient.listPartitionReassignments(topicPartitions).reassignments().get();
+            for (Tuple2<TopicPartition, Seq<Object>> tuple2 : listAsJava.asJava()) {
+                PartitionReassignment partitionReassignment = topicPartitionReassignments.get(tuple2._1);
+                if (partitionReassignment == null) {
+                    reassignResult.put(tuple2._1, TaskStatusReassignEnum.UNKNOWN);
+                } else if (!partitionReassignment.removingReplicas().isEmpty() || !partitionReassignment.addingReplicas().isEmpty()) {
+                    reassignResult.put(tuple2._1, TaskStatusReassignEnum.RUNNING);
+                    continue;
+                }
+                boolean status = ValidateUtils.equalList(
+                        reassignMap.get(tuple2._1),
+                        JavaConversions.seqAsJavaList(zkClient.getReplicasForPartition(tuple2._1))
+                );
+                reassignResult.put(tuple2._1, status ? TaskStatusReassignEnum.SUCCEED : TaskStatusReassignEnum.FAILED);
             }
-            boolean status = ValidateUtils.equalList(
-                    JavaConversions.asJavaList(reassignMap.get(tp)),
-                    JavaConversions.asJavaList(zkUtils.getReplicasForPartition(tp.topic(), tp.partition()))
-            );
-            reassignResult.put(tp, status? TaskStatusReassignEnum.SUCCEED: TaskStatusReassignEnum.FAILED);
+        } catch (Exception e) {
+            LOGGER.error("adminClient listPartitionReassignments failed", e);
         }
         return reassignResult;
     }

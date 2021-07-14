@@ -9,7 +9,7 @@ import com.xiaojukeji.kafka.manager.common.utils.DateUtils;
 import com.xiaojukeji.kafka.manager.common.utils.ValidateUtils;
 import com.xiaojukeji.kafka.manager.common.zookeeper.znode.ReassignmentElemData;
 import com.xiaojukeji.kafka.manager.common.entity.pojo.ReassignTaskDO;
-import kafka.common.TopicAndPartition;
+import org.apache.kafka.common.TopicPartition;
 
 import java.util.*;
 
@@ -46,7 +46,7 @@ public class ReassignModelConverter {
                 partitionStatusVO.setPartitionId(elemData.getPartition());
                 partitionStatusVO.setDestReplicaIdList(elemData.getReplicas());
                 TaskStatusReassignEnum reassignEnum = elem.getReassignStatusMap().get(
-                        new TopicAndPartition(elem.getTopicName(),
+                        new TopicPartition(elem.getTopicName(),
                                 elemData.getPartition())
                 );
                 if (!ValidateUtils.isNull(reassignEnum)) {
