@@ -120,7 +120,7 @@ public class TopicCommands {
 
 
             // 已有分区的分配策略
-            scala.collection.Map<TopicPartition, ReplicaAssignment> existingAssignScalaMap = kafkaZkClient.getFullReplicaAssignmentForTopics(JavaConversions.asScalaBuffer(Arrays.asList(topicName)).toSet());
+            scala.collection.Map<TopicPartition, ReplicaAssignment> existingAssignScalaMap = kafkaZkClient.getFullReplicaAssignmentForTopics(JavaConversions.asScalaBuffer(Arrays.asList(topicName)).<String>toSet());
             // 新增分区的分配策略
             ReplicaAssignment sample = existingAssignScalaMap.head()._2();
 
