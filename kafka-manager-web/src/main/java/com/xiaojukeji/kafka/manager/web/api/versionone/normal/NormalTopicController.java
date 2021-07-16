@@ -25,6 +25,7 @@ import com.xiaojukeji.kafka.manager.web.converters.CommonModelConverter;
 import com.xiaojukeji.kafka.manager.web.converters.TopicModelConverter;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -258,7 +259,7 @@ public class NormalTopicController {
             return Result.buildFrom(ResultStatus.TOPIC_NOT_EXIST);
         }
 
-        List<String> dataList = topicService.fetchTopicData(clusterDO, topicName, reqObj);
+        List<ConsumerRecord<String,String>> dataList = topicService.fetchTopicData(clusterDO, topicName, reqObj);
         if (ValidateUtils.isNull(dataList)) {
             return Result.buildFrom(ResultStatus.OPERATION_FAILED);
         }

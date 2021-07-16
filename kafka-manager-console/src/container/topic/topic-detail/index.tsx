@@ -26,9 +26,14 @@ import Url from 'lib/url-parser';
 import router from 'routers/router';
 const { TabPane } = Tabs;
 import { app } from 'store/app';
+import Table from "antd/es/table";
+import {pagination} from "constants/table";
 
 interface IInfoData {
   value: string;
+  createDate: string;
+  offset: number;
+  msgKey: string;
   history: any;
 }
 
@@ -114,6 +119,28 @@ export class TopicDetail extends React.Component<any> {
     };
     wrapper.open(this.xFormWrapper);
   }
+  public renderColumns = () => {
+    return [{
+      title: 'offset',
+      key: 'offset',
+      dataIndex: 'offset',
+      sorter: (a: IInfoData, b: IInfoData) => b.offset - a.offset,
+    }, {
+      title: 'msgKey',
+      key: 'msgKey',
+      dataIndex: 'msgKey',
+      sorter: (a: IInfoData, b: IInfoData) => b.msgKey > a.msgKey? 1:-1,
+    }, {
+      title: 'createDate',
+      key: 'createDate',
+      dataIndex: 'createDate',
+      sorter: (a: IInfoData, b: IInfoData) => b.createDate > a.createDate? 1:-1,
+    }, {
+      title: 'value',
+      key: 'value',
+      dataIndex: 'value',
+    }];
+  }
 
   public drawerRender() {
     const formMap = [
@@ -190,7 +217,7 @@ export class TopicDetail extends React.Component<any> {
           closable={false}
           onClose={this.drawerClose}
           visible={this.state.drawerVisible}
-          width={600}
+          width={1000}
           key="1"
         >
           <XFormComponent
@@ -229,15 +256,13 @@ export class TopicDetail extends React.Component<any> {
                 />
               </h3>
               <div className="detail-sample-span">
-                {infoTopicList.map((v, index) => (
-                  <li key={index}>
-                    <Icon
-                      onClick={() => copyString(v.value)}
-                      type="copy"
-                      className="didi-theme"
-                    /> {v.value}
-                  </li>
-                ))}
+                <Table
+                    columns={this.renderColumns()}
+                    table-Layout="fixed"
+                    dataSource={infoTopicList}
+                    rowKey="offset"
+                    pagination={pagination}
+                />
               </div>
             </div>
           </div>

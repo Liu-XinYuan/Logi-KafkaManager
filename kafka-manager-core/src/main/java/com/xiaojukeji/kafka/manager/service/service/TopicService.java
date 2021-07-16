@@ -11,6 +11,8 @@ import com.xiaojukeji.kafka.manager.common.entity.pojo.TopicMetricsDO;
 import com.xiaojukeji.kafka.manager.common.entity.ao.topic.TopicBrokerDTO;
 import com.xiaojukeji.kafka.manager.common.zookeeper.znode.brokers.PartitionState;
 import com.xiaojukeji.kafka.manager.common.entity.pojo.ClusterDO;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 
@@ -88,13 +90,13 @@ public interface TopicService {
     /**
      * 数据采样
      */
-    List<String> fetchTopicData(ClusterDO clusterDO, String topicName, TopicDataSampleDTO reqObj);
-    List<String> fetchTopicData(KafkaConsumer kafkaConsumer, Integer maxMsgNum, Integer timeout, Boolean truncated);
+    List<ConsumerRecord<String, String>> fetchTopicData(ClusterDO clusterDO, String topicName, TopicDataSampleDTO reqObj);
+    List<ConsumerRecord<String, String>> fetchTopicData(KafkaConsumer kafkaConsumer, Integer maxMsgNum, Integer timeout, Boolean truncated);
 
     /**
      * 采样指定分区最新的数据
      */
-    List<String> fetchTopicData(KafkaConsumer kafkaConsumer,
+    List<ConsumerRecord<String,String>> fetchTopicData(KafkaConsumer kafkaConsumer,
                                 Integer maxMsgNum,
                                 Long maxWaitMs,
                                 Boolean truncated,

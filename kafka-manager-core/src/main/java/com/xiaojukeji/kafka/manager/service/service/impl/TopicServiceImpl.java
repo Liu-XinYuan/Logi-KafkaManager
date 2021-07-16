@@ -593,7 +593,7 @@ public class TopicServiceImpl implements TopicService {
     }
 
     @Override
-    public List<String> fetchTopicData(ClusterDO clusterDO, String topicName, TopicDataSampleDTO reqObj) {
+    public List<ConsumerRecord<String,String>> fetchTopicData(ClusterDO clusterDO, String topicName, TopicDataSampleDTO reqObj) {
         KafkaConsumer kafkaConsumer = null;
         try {
             kafkaConsumer = createConsumerClient(clusterDO, reqObj.getMaxMsgNum() + 1);
@@ -608,7 +608,7 @@ public class TopicServiceImpl implements TopicService {
         return null;
     }
 
-    private List<String> fetchTopicData(KafkaConsumer kafkaConsumer, ClusterDO clusterDO, String topicName, TopicDataSampleDTO reqObj) {
+    private List<ConsumerRecord<String,String>> fetchTopicData(KafkaConsumer kafkaConsumer, ClusterDO clusterDO, String topicName, TopicDataSampleDTO reqObj) {
         TopicMetadata topicMetadata = PhysicalClusterMetadataManager.getTopicMetadata(clusterDO.getId(), topicName);
         List<TopicPartition> tpList = new ArrayList<>();
         for (int partitionId = 0; partitionId < topicMetadata.getPartitionNum(); ++partitionId) {
@@ -632,7 +632,7 @@ public class TopicServiceImpl implements TopicService {
     }
 
     @Override
-    public List<String> fetchTopicData(KafkaConsumer kafkaConsumer,
+    public List<ConsumerRecord<String,String>> fetchTopicData(KafkaConsumer kafkaConsumer,
                                         Integer maxMsgNum,
                                         Long maxWaitMs,
                                         Boolean truncated,
@@ -644,7 +644,7 @@ public class TopicServiceImpl implements TopicService {
 
         Long begin = System.currentTimeMillis();
         Long remainingWaitMs = maxWaitMs;
-        List<String> dataList = new ArrayList<>(maxMsgNum);
+        List<ConsumerRecord<String,String>> dataList = new ArrayList<>(maxMsgNum);
         // 遍历所有分区最新的数据
         for (Map.Entry<TopicPartition, Long> entry : endOffsetMap.entrySet()) {
             if (remainingWaitMs <= 0) {
@@ -669,7 +669,7 @@ public class TopicServiceImpl implements TopicService {
         return dataList;
     }
 
-    private List<String> fetchTopicDataNotRetry(KafkaConsumer kafkaConsumer,
+    private List<ConsumerRecord<String,String>> fetchTopicDataNotRetry(KafkaConsumer kafkaConsumer,
                                                 Integer maxMsgNum,
                                                 Long maxWaitMs,
                                                 Boolean truncated) {
@@ -679,7 +679,7 @@ public class TopicServiceImpl implements TopicService {
         long begin = System.currentTimeMillis();
         long remainingWaitMs = maxWaitMs;
 
-        List<String> dataList = new ArrayList<>();
+        List<ConsumerRecord<String,String>> dataList = new ArrayList<>();
         int currentSize = dataList.size();
         while (dataList.size() < maxMsgNum) {
             try {
@@ -688,12 +688,7 @@ public class TopicServiceImpl implements TopicService {
                 }
                 ConsumerRecords<String, String> records = kafkaConsumer.poll(TopicSampleConstant.POLL_TIME_OUT_UNIT_MS);
                 for (ConsumerRecord record : records) {
-                    String value = (String) record.value();
-                    dataList.add(
-                            truncated ?
-                                    value.substring(0, Math.min(value.length(), TopicSampleConstant.MAX_DATA_LENGTH_UNIT_BYTE))
-                                    : value
-                    );
+                    dataList.add(record);
                 }
                 // 当前批次一条数据都没拉取到，则结束拉取
                 if (dataList.size() - currentSize == 0) {
@@ -714,23 +709,18 @@ public class TopicServiceImpl implements TopicService {
     }
 
     @Override
-    public List<String> fetchTopicData(KafkaConsumer kafkaConsumer,
+    public List<ConsumerRecord<String, String>> fetchTopicData(KafkaConsumer kafkaConsumer,
                                        Integer maxMsgNum,
                                        Integer timeout,
                                        Boolean truncated) {
-        List<String> dataList = new ArrayList<>();
+        List<ConsumerRecord<String, String>> dataList = new ArrayList<>();
 
         long timestamp = System.currentTimeMillis();
         while (dataList.size() < maxMsgNum) {
             try {
                 ConsumerRecords<String, String> records = kafkaConsumer.poll(TopicSampleConstant.POLL_TIME_OUT_UNIT_MS);
                 for (ConsumerRecord record : records) {
-                    String value = (String) record.value();
-                    dataList.add(
-                            truncated ?
-                                    value.substring(0, Math.min(value.length(), TopicSampleConstant.MAX_DATA_LENGTH_UNIT_BYTE))
-                                    : value
-                    );
+                    dataList.add(record);
                 }
                 if (System.currentTimeMillis() - timestamp > timeout
                         || dataList.size() >= maxMsgNum) {

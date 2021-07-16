@@ -12,7 +12,9 @@ import com.xiaojukeji.kafka.manager.common.utils.ValidateUtils;
 import com.xiaojukeji.kafka.manager.common.utils.jmx.JmxConstant;
 import com.xiaojukeji.kafka.manager.common.entity.pojo.TopicMetricsDO;
 import com.xiaojukeji.kafka.manager.service.utils.MetricsConvertUtils;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -184,14 +186,17 @@ public class TopicModelConverter {
         return voList;
     }
 
-    public static List<TopicDataSampleVO> convert2TopicDataSampleVOList(List<String> dataList) {
+    public static List<TopicDataSampleVO> convert2TopicDataSampleVOList(List<ConsumerRecord<String, String>> dataList) {
         if (ValidateUtils.isNull(dataList)) {
             return new ArrayList<>();
         }
         List<TopicDataSampleVO> voList = new ArrayList<>();
-        for (String data : dataList) {
+        for (ConsumerRecord<String, String> data : dataList) {
             TopicDataSampleVO topicDataSampleVO = new TopicDataSampleVO();
-            topicDataSampleVO.setValue(data);
+            topicDataSampleVO.setMsgKey(data.key());
+            topicDataSampleVO.setValue(data.value());
+            topicDataSampleVO.setOffset(data.offset());
+            topicDataSampleVO.setCreateDate(new Timestamp(data.timestamp()).toString());
             voList.add(topicDataSampleVO);
         }
         return voList;
