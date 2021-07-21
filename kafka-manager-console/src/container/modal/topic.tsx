@@ -35,13 +35,6 @@ export const applyTopic = () => {
         attrs: {
           addonBefore: region.currentRegion === 'us' || region.currentRegion === 'ru' ? `${region.currentRegion}01_` : '',
         },
-        rules: [
-          {
-            required: true,
-            pattern: /^[-\w]{3,128}$/,
-            message: '只能包含字母、数字、下划线（_）和短划线(-),长度限制在3-128字符之间',
-          },
-        ],
       },
       {
         key: 'appId',
@@ -186,7 +179,7 @@ export const showApplyQuatoModal = (item: ITopic | IAppsIdInfo, record: IQuotaQu
       //   rules: [{ required: true, message: '' }],
       //   attrs: { disabled: true },
       //   invisible: !item.hasOwnProperty('clusterName'),
-      // }, 
+      // },
       {
         key: 'topicName',
         label: 'Topic名称',
@@ -300,7 +293,7 @@ export const showTopicApplyQuatoModal = (item: ITopic) => {
       //   attrs: { disabled: true },
       //   defaultValue: item.clusterName,
       //   // invisible: !item.hasOwnProperty('clusterName'),
-      // }, 
+      // },
       {
         key: 'topicName',
         label: 'Topic名称',
