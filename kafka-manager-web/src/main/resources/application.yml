@@ -93,3 +93,9 @@ notify:
     topic-name: didi-kafka-notify
   order:
     detail-url: http://127.0.0.1
+
+prometheus:
+  pushgateway: 10.210.14.45:9091
+  jobName: kafkatest-cdp-metrics
+
+

@@ -11,6 +11,7 @@ import io.prometheus.client.exporter.PushGateway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,8 @@ import java.util.Map;
 @Component
 public class PushConsumerMetrics {
     private final static Logger LOGGER = LoggerFactory.getLogger(LogConstant.SCHEDULED_PUSH_TASK_LOGGER);
+    @Value("${prometheus.jobName}")
+    private String jobName;
     private Map<Long, String> clusterMap = new HashMap<>();
     private Gauge lag = Gauge.build().name("lag")
             .help("lag")
@@ -31,17 +34,20 @@ public class PushConsumerMetrics {
     @Autowired
     private ClusterService clusterService;
 
+    @Autowired
+    private PushGatewayUtils pushGatewayUtils;
+
 
     @Scheduled(cron = "0/5 * * * * ?")
     public void pushConsumerMetrics() {
         long startTime = System.currentTimeMillis();
         LOGGER.info("push consumer-metrics start.");
-        PushGateway pushGateway = PushGatewayUtils.getPushGateway();
+        PushGateway pushGateway = pushGatewayUtils.getPushGateway();
         CollectorRegistry defaultRegistry = CollectorRegistry.defaultRegistry;
         Map<Long, List<ConsumeSummaryDTO>> allConsumerMetricsToCache = KafkaMetricsCache.getAllConsumerMetricsToCache();
         recordMetrics(allConsumerMetricsToCache,defaultRegistry);
         try {
-            pushGateway.pushAdd(defaultRegistry, "kafka-cdp-metrics");
+            pushGateway.pushAdd(defaultRegistry, jobName);
         } catch (IOException e) {
             LOGGER.error("push consumer-metrics IO ERROR",e);
         }
