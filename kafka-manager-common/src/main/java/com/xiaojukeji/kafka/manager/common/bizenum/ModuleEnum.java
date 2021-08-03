@@ -23,6 +23,8 @@ public enum  ModuleEnum {
 
     GATEWAY_CONFIG(6, "Gateway配置"),
 
+    BROOKLIN_CLUSTER(7, "集群"),
+
     UNKNOWN(-1, "未知")
             ;
     ModuleEnum(int code, String message) {

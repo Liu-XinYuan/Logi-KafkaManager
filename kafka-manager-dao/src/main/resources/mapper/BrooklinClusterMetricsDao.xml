@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="BrooklinClusterMetricsDao">
+    <resultMap id="BrooklinClusterMetricsMap" type="com.xiaojukeji.kafka.manager.common.entity.pojo.BrooklinClusterMetricsDO">
+        <id property="id" column="id" />
+        <result property="clusterId"            column="cluster_id" />
+        <result property="metrics"              column="metrics" />
+        <result property="gmtCreate"            column="gmt_create" />
+    </resultMap>
+
+    <select id="getClusterMetrics" parameterType="java.util.Map" resultMap="BrooklinClusterMetricsMap">
+        <![CDATA[
+		SELECT * FROM brooklin_cluster_metrics
+		WHERE cluster_id = #{clusterId}
+		  AND gmt_create BETWEEN #{startTime}
+		  AND #{endTime} ORDER BY gmt_create ASC
+	]]>
+    </select>
+
+    <insert id="batchAdd" parameterType="java.util.List">
+        INSERT INTO brooklin_cluster_metrics
+          (cluster_id, metrics, gmt_create)
+        VALUES
+        <foreach item="BrooklinClusterMetricsDO" index="index" collection="list" separator=",">
+            (#{BrooklinClusterMetricsDO.clusterId}, #{BrooklinClusterMetricsDO.metrics}, now())
+        </foreach>
+    </insert>
+
+    <delete id="deleteBeforeTime" parameterType="java.util.Date">
+        <![CDATA[
+		DELETE FROM brooklin_cluster_metrics WHERE gmt_create < #{endTime} LIMIT 200
+	]]>
+    </delete>
+</mapper>

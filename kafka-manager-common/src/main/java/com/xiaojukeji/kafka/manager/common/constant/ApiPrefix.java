@@ -16,6 +16,7 @@ public class ApiPrefix {
     public static final String API_V1_NORMAL_PREFIX = API_V1_PREFIX + "normal/";
     public static final String API_V1_RD_PREFIX = API_V1_PREFIX + "rd/";
     public static final String API_V1_OP_PREFIX = API_V1_PREFIX + "op/";
+    public static final String API_V1_BR_PREFIX = API_V1_PREFIX + "brooklin/";
 
     // open
     public static final String API_V1_THIRD_PART_PREFIX = API_V1_PREFIX + "third-part/";

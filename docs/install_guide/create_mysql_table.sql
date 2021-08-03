@@ -589,3 +589,27 @@ CREATE TABLE `work_order` (
   `gmt_modify` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='工单表';
+
+-- DROP TABLE IF EXISTS `brooklin_cluster`;
+CREATE TABLE `brooklin_cluster` (
+                           `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '集群id',
+                           `cluster_name` varchar(128) NOT NULL DEFAULT '' COMMENT '集群名称',
+                           `zookeeper` varchar(512) NOT NULL DEFAULT '' COMMENT 'zk地址',
+                           `brooklin_servers` varchar(512) NOT NULL DEFAULT '' COMMENT 'server地址',
+                           `jmx_properties` text COMMENT 'JMX配置',
+                           `status` tinyint(4) NOT NULL DEFAULT '1' COMMENT ' 监控标记, 0表示未监控, 1表示监控中',
+                           `gmt_create` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                           `gmt_modify` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+                           PRIMARY KEY (`id`),
+                           UNIQUE KEY `uniq_brooklin_cluster_name` (`cluster_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='brooklincluster信息表';
+
+-- DROP TABLE IF EXISTS `brooklin_cluster_metrics`;
+CREATE TABLE `brooklin_cluster_metrics` (
+                                   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '自增id',
+                                   `cluster_id` bigint(20) NOT NULL DEFAULT '0' COMMENT '集群id',
+                                   `metrics` text COMMENT '指标',
+                                   `gmt_create` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                                   PRIMARY KEY (`id`),
+                                   KEY `idx_cluster_id_gmt_create` (`cluster_id`,`gmt_create`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='brooklinclustermetrics信息';
